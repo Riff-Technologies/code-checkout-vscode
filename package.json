@@ -1,29 +1,34 @@
 {
   "name": "@riff/code-checkout",
-  "version": "1.0.0",
+  "version": "0.0.13",
   "description": "Code Checkout support for paid VSCode Extensions",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "code-checkout-install": "./dist/scripts/install.js"
+  },
   "scripts": {
     "test": "jest",
-    "build": "tsc"
+    "build": "tsc",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run build && chmod +x ./dist/scripts/install.js",
+    "install-extension": "node ./dist/scripts/install.js"
   },
+  "files": [
+    "dist",
+    "package.json",
+    "README.md",
+    "LICENSE"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Riff-Technologies/code-checkout.git"
   },
   "author": "Riff Tech, LLC",
   "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/Riff-Technologies/code-checkout/issues"
-  },
-  "homepage": "https://github.com/Riff-Technologies/code-checkout#readme",
   "devDependencies": {
     "jest": "^29.7.0",
     "typescript": "^5.7.2"
   },
-  "dependencies": {},
-  "files": [
-    "index.js",
-    "src/public"
-  ]
+  "dependencies": {}
 }
