@@ -108,20 +108,71 @@ function deleteDirectory(directory: string): void {
 }
 
 /**
+ * Updates the .vscodeignore file to remove src-related entries and add build/src_backup
+ * @returns Function to restore the original .vscodeignore content
+ */
+function updateVSCodeIgnore(): () => void {
+  const vscodeignorePath = ".vscodeignore";
+  const foldersToAdd = ["build/**", "src_backup/**"];
+
+  let originalContent = "";
+  if (fs.existsSync(vscodeignorePath)) {
+    originalContent = fs.readFileSync(vscodeignorePath, "utf8");
+  }
+
+  // Filter out src entries and get existing content
+  const existingLines = originalContent
+    ? originalContent.split("\n").filter((line) => {
+        const trimmedLine = line.trim();
+        return !trimmedLine.match(/^src($|\/$|\/\*\*$)/);
+      })
+    : [];
+
+  // Add new folders if they don't already exist
+  const updatedLines = [...existingLines];
+  for (const folder of foldersToAdd) {
+    if (!existingLines.some((line) => line.trim() === folder)) {
+      updatedLines.push(folder);
+    }
+  }
+
+  const updatedContent = updatedLines.join("\n");
+  fs.writeFileSync(vscodeignorePath, updatedContent);
+  console.log(
+    "Updated .vscodeignore: removed src entries, added build and src_backup folders"
+  );
+
+  return () => {
+    if (originalContent) {
+      fs.writeFileSync(vscodeignorePath, originalContent);
+      console.log("Restored original .vscodeignore content");
+    } else {
+      // If the file didn't exist originally, remove it
+      fs.unlinkSync(vscodeignorePath);
+      console.log("Removed temporary .vscodeignore file");
+    }
+  };
+}
+
+/**
  * Updates the `main` field in package.json temporarily
- * @param newMain - Temporary value for the `main` field
+ * @param options - Build configuration options
  * @returns Function to restore the original package.json content
  */
-function updatePackageJsonMain(newMain: string): () => void {
+function updatePackageJsonMain(options: BuildOptions): () => void {
   const packageJsonPath = "package.json";
   const originalContent = fs.readFileSync(packageJsonPath, "utf8");
   const packageJson = JSON.parse(originalContent);
 
   const originalMain = packageJson.main;
-  packageJson.main = newMain;
+  // Remove leading "./" if present from sourceDir
+  const normalizedSourceDir = options.sourceDir.replace(/^\.\//, "");
+  packageJson.main = `./${normalizedSourceDir}/extension.js`;
 
   fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
-  console.log(`Temporarily updated package.json 'main' field to '${newMain}'`);
+  console.log(
+    `Temporarily updated package.json 'main' field to '${packageJson.main}'`
+  );
 
   return () => {
     fs.writeFileSync(packageJsonPath, originalContent);
@@ -146,10 +197,67 @@ async function createVSIX(): Promise<void> {
 }
 
 /**
+ * Records the original files in a directory
+ * @param directory - Directory to scan
+ * @returns Set of file paths relative to the directory
+ */
+function recordFiles(directory: string): Set<string> {
+  if (!fs.existsSync(directory)) {
+    return new Set<string>();
+  }
+  return new Set(
+    glob.sync("**/*", {
+      cwd: directory,
+      nodir: true,
+    })
+  );
+}
+
+/**
+ * Cleans up new files in a directory that weren't in the original snapshot
+ * @param directory - Directory to clean
+ * @param originalFiles - Set of original file paths
+ */
+function cleanupNewFiles(directory: string, originalFiles: Set<string>): void {
+  const currentFiles = glob.sync("**/*", {
+    cwd: directory,
+    nodir: true,
+  });
+
+  for (const file of currentFiles) {
+    if (!originalFiles.has(file)) {
+      const filePath = path.join(directory, file);
+      fs.unlinkSync(filePath);
+      console.log(`Cleaned up compiled file: ${file}`);
+    }
+  }
+
+  // Clean up empty directories
+  glob
+    .sync("**/*", {
+      cwd: directory,
+      dot: true,
+    })
+    .sort((a, b) => b.length - a.length) // Sort by length descending to process deepest dirs first
+    .forEach((item) => {
+      const fullPath = path.join(directory, item);
+      if (fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory()) {
+        try {
+          fs.rmdirSync(fullPath);
+        } catch (error) {
+          // Ignore errors when directory is not empty
+        }
+      }
+    });
+}
+
+/**
  * Main build function
  */
 async function build(): Promise<void> {
   let restorePackageJsonMain: (() => void) | null = null;
+  let restoreVSCodeIgnore: (() => void) | null = null;
+  let originalBackupFiles: Set<string> | null = null;
 
   try {
     const projectRoot = process.cwd();
@@ -176,6 +284,8 @@ async function build(): Promise<void> {
     if (fs.existsSync(options.sourceDir)) {
       fs.renameSync(options.sourceDir, backupDir);
       console.log(`Backed up '${options.sourceDir}' to '${backupDir}'`);
+      // Record original files in backup directory
+      originalBackupFiles = recordFiles(backupDir);
     }
 
     // Step 4: Replace the original `src` directory with obfuscated files
@@ -194,18 +304,29 @@ async function build(): Promise<void> {
       `Replaced '${options.sourceDir}' with contents of '${options.buildDir}'`
     );
 
-    // Step 5: Temporarily update `package.json` main field
-    restorePackageJsonMain = updatePackageJsonMain("./src/extension.js");
+    // Update .vscodeignore before packaging
+    restoreVSCodeIgnore = updateVSCodeIgnore();
+
+    // Update package.json main field with dynamic sourceDir
+    restorePackageJsonMain = updatePackageJsonMain(options);
 
     // Step 6: Run `vsce package` to create the `.vsix` file
     await createVSIX();
 
-    // Step 7: Restore the original `src` directory
+    // Step 7: Clean up and restore the original `src` directory
+    if (originalBackupFiles) {
+      cleanupNewFiles(backupDir, originalBackupFiles);
+    }
     deleteDirectory(options.sourceDir);
     fs.renameSync(backupDir, options.sourceDir);
     console.log(`Restored original '${options.sourceDir}' from backup`);
 
-    // Step 8: Restore the original package.json `main` field
+    // Restore the original .vscodeignore content
+    if (restoreVSCodeIgnore) {
+      restoreVSCodeIgnore();
+    }
+
+    // Restore the original package.json `main` field
     if (restorePackageJsonMain) {
       restorePackageJsonMain();
     }
@@ -216,9 +337,17 @@ async function build(): Promise<void> {
     const options = getBuildConfig();
     const backupDir = `${options.sourceDir}_backup`;
     if (fs.existsSync(backupDir)) {
+      if (originalBackupFiles) {
+        cleanupNewFiles(backupDir, originalBackupFiles);
+      }
       deleteDirectory(options.sourceDir);
       fs.renameSync(backupDir, options.sourceDir);
       console.log(`Restored original '${options.sourceDir}' after failure`);
+    }
+
+    // Restore .vscodeignore in case of failure
+    if (restoreVSCodeIgnore) {
+      restoreVSCodeIgnore();
     }
 
     // Restore package.json `main` field if needed
