@@ -46,10 +46,75 @@ function getExtensionInfo(): { name: string; displayName: string } {
 }
 
 /**
+ * Validates and processes command line arguments
+ * @returns The secret provided as a command line argument
+ * @throws Error if secret is not provided
+ */
+function getSecretFromArgs(): string {
+  const args = process.argv.slice(2);
+  if (args.length === 0) {
+    throw new Error(
+      "Secret parameter is required. Usage: code-checkout-install <secret>"
+    );
+  }
+  return args[0];
+}
+
+/**
+ * Ensures .env file exists and contains the secret
+ * @param secret The secret to store in .env
+ */
+function updateEnvFile(secret: string): void {
+  const envPath = path.join(process.cwd(), ".env");
+  const envContent = `CODE_CHECKOUT_SECRET="${secret}"\n`;
+
+  fs.writeFileSync(envPath, envContent, "utf-8");
+  console.log("Successfully created/updated .env file");
+}
+
+/**
+ * Ensures .vscodeignore exists and contains .env
+ */
+function updateVSCodeIgnore(): void {
+  const vscodeignorePath = path.join(process.cwd(), ".vscodeignore");
+  let content = "";
+
+  // Read existing content if file exists
+  if (fs.existsSync(vscodeignorePath)) {
+    content = fs.readFileSync(vscodeignorePath, "utf-8");
+  }
+
+  // Add .env if not already present
+  if (!content.includes(".env")) {
+    content = `${content.trim()}\n.env\n`;
+    fs.writeFileSync(vscodeignorePath, content, "utf-8");
+    console.log("Added .env to .vscodeignore");
+  }
+
+  // add `build` folder to .vscodeignore
+  if (!content.includes("build")) {
+    content = `${content.trim()}\nbuild\n`;
+    fs.writeFileSync(vscodeignorePath, content, "utf-8");
+    console.log("Added build to .vscodeignore");
+  }
+
+  // add `out` folder to .vscodeignore
+  if (!content.includes("out")) {
+    content = `${content.trim()}\nout\n`;
+    fs.writeFileSync(vscodeignorePath, content, "utf-8");
+    console.log("Added out to .vscodeignore");
+  }
+}
+
+/**
  * Updates the host extension's package.json with new commands
  */
 function updatePackageJson(): void {
   try {
+    const secret = getSecretFromArgs();
+    updateEnvFile(secret);
+    updateVSCodeIgnore();
+
     const { name, displayName } = getExtensionInfo();
     const packageJsonPath = path.join(process.cwd(), "package.json");
     const packageJson: PackageJson = JSON.parse(
