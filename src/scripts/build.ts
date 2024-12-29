@@ -11,7 +11,7 @@ const execAsync = promisify(exec);
 
 interface BuildOptions {
   buildDir: string;
-  outputDir: string;
+  sourceDir: string;
   packageJson: any;
 }
 
@@ -22,12 +22,11 @@ interface BuildOptions {
 function getBuildConfig(): BuildOptions {
   const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8"));
 
-  // Check for custom configuration in package.json
   const config = packageJson.codeCheckout || {};
 
   return {
     buildDir: config.buildDir || "./build",
-    outputDir: config.outputDir || "./out",
+    sourceDir: config.sourceDir || "./src",
     packageJson,
   };
 }
@@ -61,12 +60,7 @@ async function obfuscateFile(
     unicodeEscapeSequence: false,
   });
 
-  // Ensure the output directory exists
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-
-  // log the first line of the obfuscationResult
-  console.log(obfuscationResult.getObfuscatedCode().split("\n")[0]);
-
   fs.writeFileSync(outputPath, obfuscationResult.getObfuscatedCode());
 }
 
@@ -75,7 +69,6 @@ async function obfuscateFile(
  * @param options - Build configuration options
  */
 async function processFiles(options: BuildOptions): Promise<void> {
-  // Verify build directory exists
   if (!fs.existsSync(options.buildDir)) {
     throw new Error(`Build directory '${options.buildDir}' does not exist`);
   }
@@ -96,143 +89,58 @@ async function processFiles(options: BuildOptions): Promise<void> {
 
   for (const file of files) {
     const inputPath = path.join(options.buildDir, file);
-    // Write obfuscated files back to the build directory
     const outputPath = path.join(options.buildDir, file);
     console.log(`Processing: ${file}`);
     await obfuscateFile(inputPath, outputPath);
     console.log(`Completed: ${file}`);
   }
+}
 
-  // Copy package.json and other necessary files to build directory
-  const filesToCopy = ["package.json", "README.md", "LICENSE"];
-  for (const file of filesToCopy) {
-    if (fs.existsSync(file)) {
-      fs.copyFileSync(file, path.join(options.buildDir, file));
-    }
+/**
+ * Deletes the specified directory
+ * @param directory - Path of the directory to delete
+ */
+function deleteDirectory(directory: string): void {
+  if (fs.existsSync(directory)) {
+    fs.rmSync(directory, { recursive: true, force: true });
+    console.log(`Deleted directory: ${directory}`);
   }
 }
 
 /**
- * Ensures .vscodeignore exists and contains necessary exclusions
+ * Updates the `main` field in package.json temporarily
+ * @param newMain - Temporary value for the `main` field
+ * @returns Function to restore the original package.json content
  */
-async function updateVSCodeIgnore(): Promise<void> {
-  const vscodeignorePath = ".vscodeignore";
-  const requiredExclusions = [
-    "src/**",
-    "build/**",
-    ".gitignore",
-    ".git/**",
-    "node_modules/**",
-    "tsconfig.json",
-    ".env",
-  ];
-
-  let content = "";
-  if (fs.existsSync(vscodeignorePath)) {
-    content = fs.readFileSync(vscodeignorePath, "utf8");
-  }
-
-  const lines = new Set(content.split("\n").map((line) => line.trim()));
-  let modified = false;
-
-  for (const exclusion of requiredExclusions) {
-    if (!lines.has(exclusion)) {
-      lines.add(exclusion);
-      modified = true;
-    }
-  }
-
-  if (modified) {
-    const newContent =
-      Array.from(lines)
-        .filter((line) => line) // Remove empty lines
-        .join("\n") + "\n";
-    fs.writeFileSync(vscodeignorePath, newContent);
-    console.log("Updated .vscodeignore with required exclusions");
-  }
-}
-
-/**
- * Temporarily updates package.json to use build directory
- * @returns Function to restore original package.json
- */
-function updatePackageJsonForBuild(): () => void {
+function updatePackageJsonMain(newMain: string): () => void {
   const packageJsonPath = "package.json";
   const originalContent = fs.readFileSync(packageJsonPath, "utf8");
   const packageJson = JSON.parse(originalContent);
 
-  // Store original values
   const originalMain = packageJson.main;
-  const originalTypes = packageJson.types;
+  packageJson.main = newMain;
 
-  // Update paths to use build directory
-  packageJson.main = packageJson.main?.replace(/^(\.\/)?src\//, "./build/");
-  packageJson.types = packageJson.types?.replace(/^(\.\/)?src\//, "./build/");
-
-  // Write updated package.json
   fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
+  console.log(`Temporarily updated package.json 'main' field to '${newMain}'`);
 
-  // Return function to restore original package.json
-  return () => fs.writeFileSync(packageJsonPath, originalContent);
+  return () => {
+    fs.writeFileSync(packageJsonPath, originalContent);
+    console.log(
+      `Restored original package.json 'main' field to '${originalMain}'`
+    );
+  };
 }
 
 /**
- * Creates a VSIX package from the obfuscated code
+ * Creates a VSIX package using vsce
  */
 async function createVSIX(): Promise<void> {
   try {
-    // Update .vscodeignore to exclude src directory
-    await updateVSCodeIgnore();
-
-    // Temporarily update package.json to use build directory
-    const restorePackageJson = updatePackageJsonForBuild();
-
-    try {
-      // Run vsce package from project root
-      console.log("Creating VSIX package...");
-      await execAsync("vsce package");
-      console.log("Successfully created VSIX package");
-    } finally {
-      // Restore original package.json
-      restorePackageJson();
-    }
+    console.log("Creating VSIX package...");
+    await execAsync("vsce package");
+    console.log("Successfully created VSIX package");
   } catch (error) {
     console.error("Failed to create VSIX package:", error);
-    throw error;
-  }
-}
-
-/**
- * Verifies that required build tools are installed
- * @throws Error if any required tool is missing
- */
-async function verifyTools(): Promise<void> {
-  try {
-    // output the version of vsce
-    const vsceVersion = await execAsync("vsce --version");
-    console.log("vsce version:", vsceVersion);
-  } catch (error) {
-    throw new Error(
-      "vsce is not installed. Please install it with: npm install -g vsce"
-    );
-  }
-}
-
-/**
- * Compiles TypeScript files using tsc
- * @param buildDir - Directory where compiled JS should go
- * @throws Error if compilation fails
- */
-async function compileTypeScript(buildDir: string): Promise<void> {
-  try {
-    console.log("Compiling TypeScript files...");
-    // Ensure build directory exists
-    fs.mkdirSync(buildDir, { recursive: true });
-    // Use --outDir to specify build directory
-    await execAsync(`tsc --sourceMap false --outDir ${buildDir}`);
-    console.log("TypeScript compilation completed");
-  } catch (error) {
-    console.error("TypeScript compilation failed:", error);
     throw error;
   }
 }
@@ -241,40 +149,87 @@ async function compileTypeScript(buildDir: string): Promise<void> {
  * Main build function
  */
 async function build(): Promise<void> {
+  let restorePackageJsonMain: (() => void) | null = null;
+
   try {
     const projectRoot = process.cwd();
     process.chdir(projectRoot);
 
-    // Verify required tools are installed
-    await verifyTools();
-
     const options = getBuildConfig();
 
-    console.log("Current working directory:", process.cwd());
-    console.log("Build configuration:", options);
-
-    // Clean build directory
+    // Step 1: Run `tsc` to build to `build` directory
     if (fs.existsSync(options.buildDir)) {
-      fs.rmSync(options.buildDir, { recursive: true });
+      deleteDirectory(options.buildDir);
     }
+    console.log("Compiling TypeScript files...");
+    await execAsync(`tsc --outDir ${options.buildDir}`);
+    console.log("TypeScript compilation completed");
 
-    // Compile TypeScript files to build directory
-    await compileTypeScript(options.buildDir);
-
-    // Process and obfuscate files in the build directory
+    // Step 2: Obfuscate the JavaScript files in `build`
     await processFiles(options);
 
-    // Create VSIX from project root
+    // Step 3: Backup the original `src` directory
+    const backupDir = `${options.sourceDir}_backup`;
+    if (fs.existsSync(backupDir)) {
+      deleteDirectory(backupDir);
+    }
+    if (fs.existsSync(options.sourceDir)) {
+      fs.renameSync(options.sourceDir, backupDir);
+      console.log(`Backed up '${options.sourceDir}' to '${backupDir}'`);
+    }
+
+    // Step 4: Replace the original `src` directory with obfuscated files
+    deleteDirectory(options.sourceDir);
+    fs.mkdirSync(options.sourceDir, { recursive: true });
+
+    glob
+      .sync("**/*", { cwd: options.buildDir, nodir: true })
+      .forEach((file) => {
+        const src = path.join(options.buildDir, file);
+        const dest = path.join(options.sourceDir, file);
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        fs.copyFileSync(src, dest);
+      });
+    console.log(
+      `Replaced '${options.sourceDir}' with contents of '${options.buildDir}'`
+    );
+
+    // Step 5: Temporarily update `package.json` main field
+    restorePackageJsonMain = updatePackageJsonMain("./src/extension.js");
+
+    // Step 6: Run `vsce package` to create the `.vsix` file
     await createVSIX();
 
-    console.log("Build completed successfully!");
+    // Step 7: Restore the original `src` directory
+    deleteDirectory(options.sourceDir);
+    fs.renameSync(backupDir, options.sourceDir);
+    console.log(`Restored original '${options.sourceDir}' from backup`);
+
+    // Step 8: Restore the original package.json `main` field
+    if (restorePackageJsonMain) {
+      restorePackageJsonMain();
+    }
   } catch (error) {
     console.error("Build failed:", error);
+
+    // Restore the original `src` directory if backup exists
+    const options = getBuildConfig();
+    const backupDir = `${options.sourceDir}_backup`;
+    if (fs.existsSync(backupDir)) {
+      deleteDirectory(options.sourceDir);
+      fs.renameSync(backupDir, options.sourceDir);
+      console.log(`Restored original '${options.sourceDir}' after failure`);
+    }
+
+    // Restore package.json `main` field if needed
+    if (restorePackageJsonMain) {
+      restorePackageJsonMain();
+    }
+
     process.exit(1);
   }
 }
 
-// Run build if this script is executed directly
 if (require.main === module) {
   build();
 }

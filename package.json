@@ -1,6 +1,6 @@
 {
   "name": "@riff/code-checkout",
-  "version": "0.0.36",
+  "version": "0.0.76",
   "description": "Code Checkout support for paid VSCode Extensions",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
