@@ -7,4 +7,5 @@
   - [ ] If key is not valid link to the web to renew a license
 - [ ] Build tools
   - [ ] Add a command to the extension to buy a license
-  - [ ] Build the extension and obfuscate the JS code
+  - [x] Build the extension and obfuscate the JS code
+    - [x] update the package.json.main to `./src/extension.js`
