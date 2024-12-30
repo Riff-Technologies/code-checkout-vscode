@@ -61,15 +61,46 @@ function getSecretFromArgs(): string {
 }
 
 /**
- * Ensures .env file exists and contains the secret
+ * Ensures .env file exists and updates the secret while preserving other variables
  * @param secret The secret to store in .env
  */
 function updateEnvFile(secret: string): void {
   const envPath = path.join(process.cwd(), ".env");
-  const envContent = `CODE_CHECKOUT_SECRET="${secret}"\n`;
+  let envContent = "";
+  const secretKey = "CODE_CHECKOUT_SECRET";
 
-  fs.writeFileSync(envPath, envContent, "utf-8");
-  console.log("Successfully created/updated .env file");
+  // Read existing .env content if it exists
+  if (fs.existsSync(envPath)) {
+    envContent = fs.readFileSync(envPath, "utf-8");
+  }
+
+  // Split content into lines and parse existing variables
+  const envLines = envContent.split("\n").filter(Boolean);
+  const envVars = new Map<string, string>();
+
+  // Parse existing variables
+  for (const line of envLines) {
+    const match = line.match(/^([^=]+)=(.*)$/);
+    if (match) {
+      const [, key, value] = match;
+      envVars.set(key.trim(), value.trim());
+    }
+  }
+
+  // Update or add the secret
+  envVars.set(secretKey, `"${secret}"`);
+
+  // Convert back to .env format
+  const newContent = Array.from(envVars.entries())
+    .map(([key, value]) => `${key}=${value}`)
+    .join("\n");
+
+  fs.writeFileSync(envPath, `${newContent}\n`, "utf-8");
+  console.log(
+    `Successfully ${
+      envVars.has(secretKey) ? "updated" : "added"
+    } ${secretKey} in .env file`
+  );
 }
 
 /**
