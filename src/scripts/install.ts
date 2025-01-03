@@ -15,6 +15,9 @@ interface PackageJson {
   displayName?: string;
   contributes?: {
     commands?: VSCodeCommand[];
+    authentication?: {
+      uriHandler?: Record<string, never>;
+    };
   };
   activationEvents?: string[];
   [key: string]: unknown;
@@ -121,20 +124,28 @@ function updateVSCodeIgnore(): void {
     fs.writeFileSync(vscodeignorePath, content, "utf-8");
     console.log("Added .env to .vscodeignore");
   }
+}
 
-  // add `build` folder to .vscodeignore
-  if (!content.includes("build")) {
-    content = `${content.trim()}\nbuild\n`;
-    fs.writeFileSync(vscodeignorePath, content, "utf-8");
-    console.log("Added build to .vscodeignore");
+/**
+ * Updates package.json to include the postcompile script
+ * @param packageJsonPath - Path to package.json
+ * @returns true if package.json was modified
+ */
+function ensurePostCompileScript(packageJsonPath: string): boolean {
+  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+  const postCompileScript = "code-checkout-build";
+
+  if (packageJson.scripts?.postcompile === postCompileScript) {
+    return false;
   }
 
-  // add `out` folder to .vscodeignore
-  if (!content.includes("out")) {
-    content = `${content.trim()}\nout\n`;
-    fs.writeFileSync(vscodeignorePath, content, "utf-8");
-    console.log("Added out to .vscodeignore");
-  }
+  packageJson.scripts = {
+    ...packageJson.scripts,
+    postcompile: postCompileScript,
+  };
+
+  fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
+  return true;
 }
 
 /**
@@ -148,17 +159,32 @@ function updatePackageJson(): void {
 
     const { name, displayName } = getExtensionInfo();
     const packageJsonPath = path.join(process.cwd(), "package.json");
+
+    // Add postcompile script
+    const wasModified = ensurePostCompileScript(packageJsonPath);
+    if (wasModified) {
+      console.log("Added postcompile script to package.json");
+    }
+
     const packageJson: PackageJson = JSON.parse(
       fs.readFileSync(packageJsonPath, "utf-8")
     );
 
-    // Initialize contributes.commands if they don't exist
+    // Initialize contributes if it doesn't exist
     if (!packageJson.contributes) {
       packageJson.contributes = {};
     }
+
+    // Initialize commands if they don't exist
     if (!packageJson.contributes.commands) {
       packageJson.contributes.commands = [];
     }
+
+    // Add URI handler configuration
+    if (!packageJson.contributes.authentication) {
+      packageJson.contributes.authentication = {};
+    }
+    packageJson.contributes.authentication.uriHandler = {};
 
     // Create command using extension's name
     const newCommand: VSCodeCommand = {
@@ -174,28 +200,31 @@ function updatePackageJson(): void {
     if (!commandExists) {
       // Add the new command
       packageJson.contributes.commands.push(newCommand);
-
-      // Add activation event
-      if (!packageJson.activationEvents) {
-        packageJson.activationEvents = [];
-      }
-
-      const activationEvent = `onCommand:${newCommand.command}`;
-      if (!packageJson.activationEvents.includes(activationEvent)) {
-        packageJson.activationEvents.push(activationEvent);
-      }
-
-      // Write back to package.json
-      fs.writeFileSync(
-        packageJsonPath,
-        `${JSON.stringify(packageJson, null, 2)}\n`,
-        "utf-8"
-      );
-
-      console.log(
-        `Successfully added command ${newCommand.command} to package.json`
-      );
     }
+
+    // Add activation events
+    if (!packageJson.activationEvents) {
+      packageJson.activationEvents = [];
+    }
+
+    const activationEvents = [`onCommand:${newCommand.command}`, "onUri"];
+
+    // Add any missing activation events
+    for (const event of activationEvents) {
+      if (!packageJson.activationEvents.includes(event)) {
+        packageJson.activationEvents.push(event);
+        console.log(`Added activation event: ${event}`);
+      }
+    }
+
+    // Write back to package.json
+    fs.writeFileSync(
+      packageJsonPath,
+      `${JSON.stringify(packageJson, null, 2)}\n`,
+      "utf-8"
+    );
+
+    console.log(`Successfully updated package.json configuration`);
   } catch (error) {
     console.error("Failed to update package.json:", error);
     process.exit(1);
