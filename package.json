@@ -12,7 +12,7 @@
     "test": "jest",
     "build": "tsc",
     "build:vsix": "npm run build && node dist/scripts/build.js",
-    "prepare": "npm run build",
+    "prepare": "echo 'npm run build'",
     "prepublishOnly": "npm run build && chmod +x ./dist/scripts/install.js",
     "install-extension": "node ./dist/scripts/install.js",
     "pack:local": "rm -rf dist && npm pack"
@@ -31,9 +31,11 @@
   "license": "MIT",
   "devDependencies": {
     "@types/glob": "^8.1.0",
+    "@types/jest": "^29.5.14",
     "@types/vscode": "^1.1.37",
     "glob": "^7.2.3",
     "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
     "typescript": "^5.7.2"
   },
   "peerDependencies": {
@@ -41,7 +43,6 @@
   },
   "dependencies": {
     "glob": "^7.2.0",
-    "javascript-obfuscator": "^4.1.1",
-    "@vscode/vsce": "^3.0.0"
+    "javascript-obfuscator": "^4.1.1"
   }
 }
