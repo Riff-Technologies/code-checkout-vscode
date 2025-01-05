@@ -1,14 +1,14 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { LicenseManager } from "../private/license-manager";
-import { VSCodeStorage } from "../private/vscode-storage";
+import { validateLicense } from "../private/license-validator";
 
 /**
  * Gets the command ID based on the extension's package.json
- * @param extensionPath - The path to the extension directory
- * @returns The fully qualified command ID and package name
  */
-function getExtensionInfo(extensionPath: string): {
+function getExtensionInfo(
+  extensionPath: string,
+  commandName: string
+): {
   commandId: string;
   packageName: string;
 } {
@@ -16,7 +16,7 @@ function getExtensionInfo(extensionPath: string): {
     const packageJson = require(path.join(extensionPath, "package.json"));
     return {
       packageName: packageJson.name,
-      commandId: `${packageJson.name}.activateLicense`,
+      commandId: `${packageJson.name}.${commandName}`,
     };
   } catch (error) {
     throw new Error(
@@ -26,13 +26,33 @@ function getExtensionInfo(extensionPath: string): {
 }
 
 /**
+ * Handles the result of license validation and shows appropriate messages
+ * @param result - The validation result from validateLicense
+ * @returns True if the license is valid, false otherwise
+ */
+async function handleLicenseValidationResult(result: {
+  isValid: boolean;
+  message?: string;
+}): Promise<boolean> {
+  if (result.isValid) {
+    await vscode.window.showInformationMessage(
+      "License activated successfully!"
+    );
+    return true;
+  } else {
+    await vscode.window.showErrorMessage(
+      `License validation failed: ${result.message || "Invalid license"}`
+    );
+    return false;
+  }
+}
+
+/**
  * Handles incoming URIs for the extension
- * @param uri - The URI to handle
- * @param licenseManager - The license manager instance
  */
 async function handleUri(
   uri: vscode.Uri,
-  licenseManager: LicenseManager
+  context: vscode.ExtensionContext
 ): Promise<void> {
   try {
     const params = new URLSearchParams(uri.query);
@@ -44,16 +64,8 @@ async function handleUri(
           throw new Error("No license key provided");
         }
 
-        const result = await licenseManager.validateLicense(licenseKey);
-        if (result.isValid) {
-          await vscode.window.showInformationMessage(
-            "License activated successfully!"
-          );
-        } else {
-          await vscode.window.showErrorMessage(
-            `License validation failed: ${result.message}`
-          );
-        }
+        const result = await validateLicense(context, licenseKey);
+        await handleLicenseValidationResult(result);
         break;
 
       default:
@@ -72,88 +84,70 @@ async function handleUri(
 
 /**
  * Injects the activate command into the extension
- * @param originalActivate - The original activate function
- * @param apiEndpoint - The license validation API endpoint
- * @returns The wrapped activate function
  */
-export function injectActivateCommand(
+export function injectCheckoutCommands(
   originalActivate: (context: vscode.ExtensionContext) => void
 ) {
-  return (context: vscode.ExtensionContext) => {
-    // get the api endpoint from the environment
-    const apiEndpoint = process.env.API_ENDPOINT;
-    if (!apiEndpoint) {
-      throw new Error("API_ENDPOINT is not set");
-    }
-    const { commandId } = getExtensionInfo(context.extensionPath);
-
-    // Initialize storage and license manager
-    const storage = new VSCodeStorage(context);
-    const licenseManager = new LicenseManager(storage, apiEndpoint);
-
-    // Register URI handler
-    context.subscriptions.push(
-      vscode.window.registerUriHandler({
-        handleUri: async (uri: vscode.Uri) => {
-          await handleUri(uri, licenseManager);
-        },
-      })
-    );
-
-    // Register command for manual activation
-    context.subscriptions.push(
-      vscode.commands.registerCommand(commandId, async () => {
-        const licenseKey = await vscode.window.showInputBox({
-          prompt: "Enter your license key",
-          placeHolder: "XXXX-XXXX-XXXX-XXXX",
-          ignoreFocusOut: true,
-          validateInput: (value: string) => {
-            return value.trim().length > 0
-              ? null
-              : "License key cannot be empty";
-          },
-        });
-
-        if (!licenseKey) {
-          return; // User cancelled
-        }
-
-        try {
-          const result = await licenseManager.validateLicense(licenseKey, {
-            allowOffline: true,
-          });
-
-          if (result.isValid) {
-            await vscode.window.showInformationMessage(
-              result.wasOffline
-                ? "License validated offline successfully!"
-                : "License activated successfully!"
-            );
-          } else {
-            await vscode.window.showErrorMessage(
-              `License validation failed: ${result.message}`
-            );
-          }
-        } catch (error) {
-          await vscode.window.showErrorMessage(
-            `Failed to validate license: ${
-              error instanceof Error ? error.message : "Unknown error"
-            }`
-          );
-        }
-      })
-    );
-
+  return async (context: vscode.ExtensionContext) => {
     // Call the original activate function
     originalActivate(context);
+
+    try {
+      const { commandId } = getExtensionInfo(
+        context.extensionPath,
+        "activateLicenseCommand"
+      );
+
+      // Register URI handler
+      context.subscriptions.push(
+        vscode.window.registerUriHandler({
+          handleUri: async (uri: vscode.Uri) => {
+            await handleUri(uri, context);
+          },
+        })
+      );
+
+      // Register command for manual activation
+      context.subscriptions.push(
+        vscode.commands.registerCommand(commandId, async () => {
+          const licenseKey = await vscode.window.showInputBox({
+            prompt: "Enter your license key",
+            placeHolder: "XXXX-XXXX-XXXX-XXXX",
+            ignoreFocusOut: true,
+            validateInput: (value: string) => {
+              return value.trim().length > 0
+                ? null
+                : "License key cannot be empty";
+            },
+          });
+
+          if (!licenseKey) {
+            return; // User cancelled
+          }
+
+          try {
+            const result = await validateLicense(context, licenseKey);
+            await handleLicenseValidationResult(result);
+          } catch (error) {
+            await vscode.window.showErrorMessage(
+              `Failed to validate license: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`
+            );
+          }
+        })
+      );
+    } catch (error) {
+      console.error("Failed to initialize license management:", error);
+      throw error;
+    }
   };
 }
 
 /**
  * Decorator that automatically injects commands
- * @param apiEndpoint - The license validation API endpoint
  */
-export function withActivateCommand(apiEndpoint: string) {
+export function withActivateCommand() {
   return function (
     _target: unknown,
     _propertyKey: string,
@@ -162,7 +156,7 @@ export function withActivateCommand(apiEndpoint: string) {
     const originalActivate = descriptor.value as (
       context: vscode.ExtensionContext
     ) => void;
-    descriptor.value = injectActivateCommand(originalActivate);
+    descriptor.value = injectCheckoutCommands(originalActivate);
     return descriptor;
   };
 }

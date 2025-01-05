@@ -1,18 +1,16 @@
 import * as vscode from "vscode";
+import {
+  validateLicense,
+  getStoredLicense,
+  isLicenseExpired,
+  needsOnlineValidation,
+} from "../private/license-validator";
 
 /**
  * Options interface for the tag wrapper
  */
 interface TagOptions {
   type: "paid" | "free" | "free-trial";
-}
-
-/**
- * Response from license validation
- */
-interface LicenseValidationResponse {
-  isValid: boolean;
-  message?: string;
 }
 
 /**
@@ -30,19 +28,39 @@ export function tagFunction<T extends (...args: any[]) => Promise<any>>(
   }
 
   return (async (...args: Parameters<T>): Promise<ReturnType<T>> => {
-    const secretStorage = await getSecretStorage();
-    const licenseKey = await secretStorage.get("license-key");
+    // Get the extension context
+    const extension = vscode.extensions.getExtension("your-extension-id");
+    if (!extension) {
+      throw new Error("Extension not found");
+    }
+    await extension.activate();
+    const context = extension.exports.context;
 
+    // Check stored license
+    const licenseKey = await getStoredLicense(context);
     if (!licenseKey) {
       await showActivationPrompt();
       return undefined as ReturnType<T>;
     }
 
     try {
-      const isValid = await validateLicense(licenseKey);
-      if (!isValid) {
-        await showActivationPrompt("Your license key is invalid or expired.");
+      // Check if license is expired
+      const expired = await isLicenseExpired(context);
+      if (expired) {
+        await showActivationPrompt("Your license has expired.");
         return undefined as ReturnType<T>;
+      }
+
+      // Check if we need to validate online
+      const needsValidation = await needsOnlineValidation(context);
+      if (needsValidation) {
+        const validationResult = await validateLicense(context, licenseKey);
+        if (!validationResult.isValid) {
+          await showActivationPrompt(
+            validationResult.message || "Your license is invalid."
+          );
+          return undefined as ReturnType<T>;
+        }
       }
 
       // License is valid, execute the original function
@@ -50,56 +68,13 @@ export function tagFunction<T extends (...args: any[]) => Promise<any>>(
     } catch (error) {
       console.error("License validation failed:", error);
       await vscode.window.showErrorMessage(
-        "Unable to validate license. Please check your internet connection."
+        `Unable to validate license: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
       );
       return undefined as ReturnType<T>;
     }
   }) as T;
-}
-
-/**
- * Gets the secret storage for the extension
- * @returns The secret storage instance
- */
-async function getSecretStorage(): Promise<vscode.SecretStorage> {
-  const extension = vscode.extensions.getExtension("your-extension-id");
-  if (!extension) {
-    throw new Error("Extension not found");
-  }
-
-  await extension.activate();
-  return extension.exports.secretStorage;
-}
-
-/**
- * Validates the license key with the server
- * @param licenseKey - The license key to validate
- * @returns Whether the license is valid
- */
-async function validateLicense(licenseKey: string): Promise<boolean> {
-  try {
-    // Mock API request - replace with actual API endpoint
-    const response = await fetch(
-      "https://api.yourserver.com/validate-license",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ licenseKey }),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error("License validation failed");
-    }
-
-    const data = (await response.json()) as LicenseValidationResponse;
-    return data.isValid;
-  } catch (error) {
-    console.error("License validation error:", error);
-    throw error;
-  }
 }
 
 /**

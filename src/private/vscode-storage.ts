@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { Storage } from "./license-manager";
+import { Storage } from "./license-validator";
 
 /**
  * VSCode-based implementation of the Storage interface using vscode.secrets
@@ -13,7 +13,7 @@ export class VSCodeStorage implements Storage {
    * @param context - The VSCode extension context
    * @param prefix - Prefix for storage keys to avoid conflicts
    */
-  constructor(context: vscode.ExtensionContext, prefix = "paywall_") {
+  constructor(context: vscode.ExtensionContext, prefix = "code_checkout_") {
     this.secretStorage = context.secrets;
     this.prefix = prefix;
   }

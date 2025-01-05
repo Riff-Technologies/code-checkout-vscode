@@ -1,6 +1,6 @@
 {
   "name": "@riff/code-checkout",
-  "version": "0.0.83",
+  "version": "0.0.102",
   "description": "Code Checkout support for paid VSCode Extensions",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -12,7 +12,7 @@
     "test": "jest",
     "build": "tsc",
     "build:vsix": "npm run build && node dist/scripts/build.js",
-    "prepare": "echo 'npm run build'",
+    "prepare": "npm run build",
     "prepublishOnly": "npm run build && chmod +x ./dist/scripts/install.js",
     "install-extension": "node ./dist/scripts/install.js",
     "pack:local": "rm -rf dist && npm pack"

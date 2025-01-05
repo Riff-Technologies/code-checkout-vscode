@@ -15,9 +15,6 @@ interface PackageJson {
   displayName?: string;
   contributes?: {
     commands?: VSCodeCommand[];
-    authentication?: {
-      uriHandler?: Record<string, never>;
-    };
   };
   activationEvents?: string[];
   [key: string]: unknown;
@@ -179,12 +176,6 @@ function updatePackageJson(): void {
     if (!packageJson.contributes.commands) {
       packageJson.contributes.commands = [];
     }
-
-    // Add URI handler configuration
-    if (!packageJson.contributes.authentication) {
-      packageJson.contributes.authentication = {};
-    }
-    packageJson.contributes.authentication.uriHandler = {};
 
     // Create command using extension's name
     const newCommand: VSCodeCommand = {

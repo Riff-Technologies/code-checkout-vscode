@@ -25,6 +25,8 @@
 - [x] init should also add `onUri` activation event, if it doesn't already exist
 - [ ] refactor the `tag` script to get the package name in a universal way, and license functionality should be in a single place
 - [ ] add `.env` file to `.gitignore` on init
+- [ ] rename `injectActivateCommand` to `injectCheckoutCommands`
+- [ ] support bundling the extension
 
 ## Documentation
 
