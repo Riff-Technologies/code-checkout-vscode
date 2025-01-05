@@ -1,17 +1,23 @@
 import * as vscode from "vscode";
-import * as fs from "fs";
 import * as path from "path";
+import { LicenseManager } from "../private/license-manager";
+import { VSCodeStorage } from "../private/vscode-storage";
 
 /**
  * Gets the command ID based on the extension's package.json
  * @param extensionPath - The path to the extension directory
- * @returns The fully qualified command ID
+ * @returns The fully qualified command ID and package name
  */
-function getCommandId(extensionPath: string): string {
+function getExtensionInfo(extensionPath: string): {
+  commandId: string;
+  packageName: string;
+} {
   try {
-    const packageJsonPath = path.join(extensionPath, "package.json");
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
-    return packageJson.name;
+    const packageJson = require(path.join(extensionPath, "package.json"));
+    return {
+      packageName: packageJson.name,
+      commandId: `${packageJson.name}.activateLicense`,
+    };
   } catch (error) {
     throw new Error(
       `Failed to determine command ID from package.json: ${error}`
@@ -19,37 +25,34 @@ function getCommandId(extensionPath: string): string {
   }
 }
 
-const validateLicense = async (licenseKey: string): Promise<boolean> => {
-  return true;
-};
-
 /**
  * Handles incoming URIs for the extension
  * @param uri - The URI to handle
+ * @param licenseManager - The license manager instance
  */
 async function handleUri(
   uri: vscode.Uri,
-  context: vscode.ExtensionContext
+  licenseManager: LicenseManager
 ): Promise<void> {
   try {
-    // Parse the URI path and query parameters
     const params = new URLSearchParams(uri.query);
 
     switch (uri.path) {
       case "/activate":
         const licenseKey = params.get("key");
-        if (licenseKey) {
-          const isValid = await validateLicense(licenseKey);
-          if (isValid) {
-            await storeLicenseKey(context.secrets, licenseKey);
-            await vscode.window.showInformationMessage(
-              "License activated successfully!"
-            );
-          } else {
-            await vscode.window.showErrorMessage(
-              "Invalid license key. Please try again."
-            );
-          }
+        if (!licenseKey) {
+          throw new Error("No license key provided");
+        }
+
+        const result = await licenseManager.validateLicense(licenseKey);
+        if (result.isValid) {
+          await vscode.window.showInformationMessage(
+            "License activated successfully!"
+          );
+        } else {
+          await vscode.window.showErrorMessage(
+            `License validation failed: ${result.message}`
+          );
         }
         break;
 
@@ -60,7 +63,9 @@ async function handleUri(
   } catch (error) {
     console.error("Error handling URI:", error);
     await vscode.window.showErrorMessage(
-      "Failed to process the request. Please try again."
+      `Failed to process the request: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
     );
   }
 }
@@ -68,20 +73,29 @@ async function handleUri(
 /**
  * Injects the activate command into the extension
  * @param originalActivate - The original activate function
+ * @param apiEndpoint - The license validation API endpoint
  * @returns The wrapped activate function
  */
 export function injectActivateCommand(
   originalActivate: (context: vscode.ExtensionContext) => void
 ) {
   return (context: vscode.ExtensionContext) => {
-    const packageName = getCommandId(context.extensionPath);
-    const commandId = `${packageName}.activateLicenseCommand`;
+    // get the api endpoint from the environment
+    const apiEndpoint = process.env.API_ENDPOINT;
+    if (!apiEndpoint) {
+      throw new Error("API_ENDPOINT is not set");
+    }
+    const { commandId } = getExtensionInfo(context.extensionPath);
+
+    // Initialize storage and license manager
+    const storage = new VSCodeStorage(context);
+    const licenseManager = new LicenseManager(storage, apiEndpoint);
 
     // Register URI handler
     context.subscriptions.push(
       vscode.window.registerUriHandler({
         handleUri: async (uri: vscode.Uri) => {
-          await handleUri(uri, context);
+          await handleUri(uri, licenseManager);
         },
       })
     );
@@ -94,8 +108,9 @@ export function injectActivateCommand(
           placeHolder: "XXXX-XXXX-XXXX-XXXX",
           ignoreFocusOut: true,
           validateInput: (value: string) => {
-            // Add your license key format validation here
-            return value.length > 0 ? null : "License key cannot be empty";
+            return value.trim().length > 0
+              ? null
+              : "License key cannot be empty";
           },
         });
 
@@ -104,20 +119,26 @@ export function injectActivateCommand(
         }
 
         try {
-          const isValid = await validateLicense(licenseKey);
-          if (isValid) {
-            await storeLicenseKey(context.secrets, licenseKey);
+          const result = await licenseManager.validateLicense(licenseKey, {
+            allowOffline: true,
+          });
+
+          if (result.isValid) {
             await vscode.window.showInformationMessage(
-              "License activated successfully!"
+              result.wasOffline
+                ? "License validated offline successfully!"
+                : "License activated successfully!"
             );
           } else {
             await vscode.window.showErrorMessage(
-              "Invalid license key. Please try again."
+              `License validation failed: ${result.message}`
             );
           }
         } catch (error) {
           await vscode.window.showErrorMessage(
-            "Failed to validate license. Please check your internet connection."
+            `Failed to validate license: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }`
           );
         }
       })
@@ -129,21 +150,10 @@ export function injectActivateCommand(
 }
 
 /**
- * Stores the license key in VSCode's secret storage
- * @param secretStorage - VSCode's secret storage
- * @param licenseKey - The license key to store
- */
-async function storeLicenseKey(
-  secretStorage: vscode.SecretStorage,
-  licenseKey: string
-): Promise<void> {
-  await secretStorage.store("license-key", licenseKey);
-}
-
-/**
  * Decorator that automatically injects commands
+ * @param apiEndpoint - The license validation API endpoint
  */
-export function withActivateCommand() {
+export function withActivateCommand(apiEndpoint: string) {
   return function (
     _target: unknown,
     _propertyKey: string,

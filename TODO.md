@@ -26,15 +26,6 @@
 - [ ] refactor the `tag` script to get the package name in a universal way, and license functionality should be in a single place
 - [ ] add `.env` file to `.gitignore` on init
 
-## License validation
-
-### How it works
-
-I am writing a typescript package that will be added to projects to provide paywall functionality. I want to make a plan for how licenses are managed, considering the following factors:
-
-- Support licenses being revoked prior to their expiration
-- Offline support, perhaps via a grace period or by assuming a license is still valid until proven otherwise
-
 ## Documentation
 
 - [ ] manual setup (scripts, envars, etc.)
@@ -51,4 +42,7 @@ I am writing a typescript package that will be added to projects to provide payw
 
 ## Things to try in order to break stuff
 
+- [ ] test license validation
+- [ ] test URI for opening the extension via URL
+  - [ ] test it also when the extension has existing URI functionality - will it overwrite what's there?
 - [ ] test with all the various kinds of extensions (run `npx --package yo --package generator-code -- yo code` to see them)
