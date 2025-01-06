@@ -106,7 +106,17 @@ function updatePackageJson(): void {
       title: `${displayName}: Revoke License`,
     };
 
-    const commands = [activateLicenseCommand, revokeLicenseCommand];
+    const activateOnlineCommand: VSCodeCommand = {
+      command: `${name}.activateOnlineCommand`,
+      title: `${displayName}: Activate License Online`,
+      category: "Extension Management",
+    };
+
+    const commands = [
+      activateLicenseCommand,
+      revokeLicenseCommand,
+      activateOnlineCommand,
+    ];
     for (const newCommand of commands) {
       // Check if command already exists
       const commandExists = packageJson.contributes.commands.some(

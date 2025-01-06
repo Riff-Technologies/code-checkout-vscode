@@ -103,6 +103,10 @@ export function injectCheckoutCommands(
         context.extensionPath,
         "revokeLicenseCommand",
       );
+      const { commandId: activateOnlineCommandId } = getExtensionInfo(
+        context.extensionPath,
+        "activateOnlineCommand",
+      );
 
       // Register URI handler
       context.subscriptions.push(
@@ -153,6 +157,13 @@ export function injectCheckoutCommands(
           );
         }),
       );
+
+      // Register a command for activating the license online
+      context.subscriptions.push(
+        vscode.commands.registerCommand(activateOnlineCommandId, async () => {
+          await activateLicenseOnline(context);
+        }),
+      );
     } catch (error) {
       console.error("Failed to initialize license management:", error);
       throw error;
@@ -178,4 +189,30 @@ export function withActivateCommand() {
     descriptor.value = injectCheckoutCommands(originalActivate);
     return descriptor;
   };
+}
+
+/**
+ * Opens the license activation website in the default web browser
+ * @param context - The VS Code extension context
+ * @throws Error if unable to determine the extension ID or open the URL
+ */
+async function activateLicenseOnline(
+  context: vscode.ExtensionContext,
+): Promise<void> {
+  try {
+    // Get the extension ID (publisher.name)
+    const { id: extensionId } = context.extension;
+
+    // Construct and encode the activation URL
+    const activationUrl = new URL(
+      `https://mywebsite.com/${extensionId}/activate`,
+    );
+
+    // Open the URL in the default web browser
+    await vscode.env.openExternal(vscode.Uri.parse(activationUrl.toString()));
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    throw new Error(`Failed to open activation website: ${errorMessage}`);
+  }
 }

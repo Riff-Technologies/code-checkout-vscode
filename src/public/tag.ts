@@ -33,6 +33,13 @@ export function tagFunction<T extends (...args: any[]) => any>(
   if (options.type === "free") {
     return fn;
   }
+  // get just the extension name
+  const { id: extensionId } = context.extension;
+  const extensionNameComponents = extensionId.split(".");
+  if (extensionNameComponents.length < 2) {
+    throw new Error("Invalid extension ID");
+  }
+  const extensionName = extensionNameComponents[1];
 
   return (async (
     ...args: Parameters<T>
@@ -40,7 +47,7 @@ export function tagFunction<T extends (...args: any[]) => any>(
     // Check stored license
     const licenseKey = await getStoredLicense(context);
     if (!licenseKey) {
-      await showActivationPrompt();
+      await showActivationPrompt(undefined, extensionName);
       return undefined as UnwrapPromise<ReturnType<T>>;
     }
 
@@ -48,7 +55,7 @@ export function tagFunction<T extends (...args: any[]) => any>(
       // Check if license is expired
       const expired = await isLicenseExpired(context);
       if (expired) {
-        await showActivationPrompt("Your license has expired.");
+        await showActivationPrompt("Your license has expired.", extensionName);
         return undefined as UnwrapPromise<ReturnType<T>>;
       }
 
@@ -59,6 +66,7 @@ export function tagFunction<T extends (...args: any[]) => any>(
         if (!validationResult.isValid) {
           await showActivationPrompt(
             validationResult.message || "Your license is invalid.",
+            extensionName,
           );
           return undefined as UnwrapPromise<ReturnType<T>>;
         }
@@ -87,6 +95,7 @@ export function tagFunction<T extends (...args: any[]) => any>(
  */
 async function showActivationPrompt(
   message = "This feature requires a valid license.",
+  extensionName: string,
 ): Promise<void> {
   const activate = "Activate License";
   const response = await vscode.window.showInformationMessage(
@@ -96,6 +105,8 @@ async function showActivationPrompt(
   );
 
   if (response === activate) {
-    await vscode.commands.executeCommand("your-extension.activate");
+    await vscode.commands.executeCommand(
+      `${extensionName}.activateOnlineCommand`,
+    );
   }
 }
