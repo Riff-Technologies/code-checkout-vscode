@@ -96,33 +96,41 @@ function updatePackageJson(): void {
     }
 
     // Create command using extension's name
-    const newCommand: VSCodeCommand = {
+    const activateLicenseCommand: VSCodeCommand = {
       command: `${name}.activateLicenseCommand`,
       title: `${displayName}: Activate License`,
     };
 
-    // Check if command already exists
-    const commandExists = packageJson.contributes.commands.some(
-      (cmd) => cmd.command === newCommand.command,
-    );
+    const revokeLicenseCommand: VSCodeCommand = {
+      command: `${name}.revokeLicenseCommand`,
+      title: `${displayName}: Revoke License`,
+    };
 
-    if (!commandExists) {
-      // Add the new command
-      packageJson.contributes.commands.push(newCommand);
-    }
+    const commands = [activateLicenseCommand, revokeLicenseCommand];
+    for (const newCommand of commands) {
+      // Check if command already exists
+      const commandExists = packageJson.contributes.commands.some(
+        (cmd) => cmd.command === newCommand.command,
+      );
 
-    // Add activation events
-    if (!packageJson.activationEvents) {
-      packageJson.activationEvents = [];
-    }
+      if (!commandExists) {
+        // Add the new command
+        packageJson.contributes.commands.push(newCommand);
+      }
 
-    const activationEvents = [`onCommand:${newCommand.command}`, "onUri"];
+      // Add activation events
+      if (!packageJson.activationEvents) {
+        packageJson.activationEvents = [];
+      }
 
-    // Add any missing activation events
-    for (const event of activationEvents) {
-      if (!packageJson.activationEvents.includes(event)) {
-        packageJson.activationEvents.push(event);
-        console.log(`Added activation event: ${event}`);
+      const activationEvents = [`onCommand:${newCommand.command}`, "onUri"];
+
+      // Add any missing activation events
+      for (const event of activationEvents) {
+        if (!packageJson.activationEvents.includes(event)) {
+          packageJson.activationEvents.push(event);
+          console.log(`Added activation event: ${event}`);
+        }
       }
     }
 

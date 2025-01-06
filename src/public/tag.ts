@@ -7,40 +7,41 @@ import {
 } from "../private/license-validator";
 
 /**
- * Options interface for the tag wrapper
+ * Type helper to unwrap a Promise type
+ */
+type UnwrapPromise<T> = T extends Promise<infer U> ? U : T;
+
+/**
+ * Options for tagging a function with license validation
  */
 interface TagOptions {
-  type: "paid" | "free" | "free-trial";
+  type: "free" | "free-trial" | "pro";
 }
 
 /**
- * Higher-order function that wraps a function call and validates licensing before execution
- * @param options - Configuration options
- * @param fn - The function to wrap
- * @returns A new function that validates licensing before executing the original
+ * Tags a function with license validation
+ * @param options - Configuration options for the tag
+ * @param fn - Function to wrap with license validation
+ * @returns Tagged function that performs license validation before execution
  */
-export function tagFunction<T extends (...args: any[]) => Promise<any>>(
+export function tagFunction<T extends (...args: any[]) => any>(
+  context: vscode.ExtensionContext,
   options: TagOptions,
-  fn: T
+  fn: T,
 ): T {
+  // Free functions pass through without validation
   if (options.type === "free") {
     return fn;
   }
 
-  return (async (...args: Parameters<T>): Promise<ReturnType<T>> => {
-    // Get the extension context
-    const extension = vscode.extensions.getExtension("your-extension-id");
-    if (!extension) {
-      throw new Error("Extension not found");
-    }
-    await extension.activate();
-    const context = extension.exports.context;
-
+  return (async (
+    ...args: Parameters<T>
+  ): Promise<UnwrapPromise<ReturnType<T>>> => {
     // Check stored license
     const licenseKey = await getStoredLicense(context);
     if (!licenseKey) {
       await showActivationPrompt();
-      return undefined as ReturnType<T>;
+      return undefined as UnwrapPromise<ReturnType<T>>;
     }
 
     try {
@@ -48,7 +49,7 @@ export function tagFunction<T extends (...args: any[]) => Promise<any>>(
       const expired = await isLicenseExpired(context);
       if (expired) {
         await showActivationPrompt("Your license has expired.");
-        return undefined as ReturnType<T>;
+        return undefined as UnwrapPromise<ReturnType<T>>;
       }
 
       // Check if we need to validate online
@@ -57,22 +58,25 @@ export function tagFunction<T extends (...args: any[]) => Promise<any>>(
         const validationResult = await validateLicense(context, licenseKey);
         if (!validationResult.isValid) {
           await showActivationPrompt(
-            validationResult.message || "Your license is invalid."
+            validationResult.message || "Your license is invalid.",
           );
-          return undefined as ReturnType<T>;
+          return undefined as UnwrapPromise<ReturnType<T>>;
         }
       }
 
-      // License is valid, execute the original function
-      return fn(...args);
+      // Execute the original function and handle both sync and async results
+      const result = fn(...args);
+      return result instanceof Promise
+        ? ((await result) as UnwrapPromise<ReturnType<T>>)
+        : (result as UnwrapPromise<ReturnType<T>>);
     } catch (error) {
       console.error("License validation failed:", error);
       await vscode.window.showErrorMessage(
         `Unable to validate license: ${
           error instanceof Error ? error.message : "Unknown error"
-        }`
+        }`,
       );
-      return undefined as ReturnType<T>;
+      return undefined as UnwrapPromise<ReturnType<T>>;
     }
   }) as T;
 }
@@ -82,13 +86,13 @@ export function tagFunction<T extends (...args: any[]) => Promise<any>>(
  * @param message - Optional custom message to display
  */
 async function showActivationPrompt(
-  message = "This feature requires a valid license."
+  message = "This feature requires a valid license.",
 ): Promise<void> {
   const activate = "Activate License";
   const response = await vscode.window.showInformationMessage(
     message,
     { modal: false },
-    activate
+    activate,
   );
 
   if (response === activate) {

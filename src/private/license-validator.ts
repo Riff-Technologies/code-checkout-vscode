@@ -85,6 +85,15 @@ async function getLicenseData(
 }
 
 /**
+ * Revokes the stored license
+ */
+export async function revokeLicense(
+  context: vscode.ExtensionContext,
+): Promise<void> {
+  await clearLicenseData(context);
+}
+
+/**
  * Validates a license key with the server
  * @param context - The extension context
  * @param licenseKey - The license key to validate (will be used as API key)

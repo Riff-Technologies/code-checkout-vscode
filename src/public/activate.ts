@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { validateLicense } from "../private/license-validator";
+import { revokeLicense, validateLicense } from "../private/license-validator";
 
 /**
  * Gets the command ID based on the extension's package.json
@@ -95,9 +95,13 @@ export function injectCheckoutCommands(
 ) {
   return async (context: vscode.ExtensionContext) => {
     try {
-      const { commandId } = getExtensionInfo(
+      const { commandId: activateLicenseCommandId } = getExtensionInfo(
         context.extensionPath,
         "activateLicenseCommand",
+      );
+      const { commandId: revokeLicenseCommandId } = getExtensionInfo(
+        context.extensionPath,
+        "revokeLicenseCommand",
       );
 
       // Register URI handler
@@ -111,7 +115,7 @@ export function injectCheckoutCommands(
 
       // Register command for manual activation
       context.subscriptions.push(
-        vscode.commands.registerCommand(commandId, async () => {
+        vscode.commands.registerCommand(activateLicenseCommandId, async () => {
           const licenseKey = await vscode.window.showInputBox({
             prompt: "Enter your license key",
             placeHolder: "XXXX-XXXX-XXXX-XXXX",
@@ -137,6 +141,16 @@ export function injectCheckoutCommands(
               }`,
             );
           }
+        }),
+      );
+
+      // Register a command for revoking the license
+      context.subscriptions.push(
+        vscode.commands.registerCommand(revokeLicenseCommandId, async () => {
+          await revokeLicense(context);
+          await vscode.window.showInformationMessage(
+            "License revoked successfully!",
+          );
         }),
       );
     } catch (error) {
