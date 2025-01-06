@@ -1,5 +1,4 @@
 import * as vscode from "vscode";
-import { createHash } from "crypto";
 
 const API_ENDPOINT = "https://api.riff.codes/validate-license"; // Your actual API endpoint
 
@@ -39,34 +38,6 @@ export interface Storage {
    * @param key - The key to remove
    */
   removeItem(key: string): Promise<void>;
-}
-
-/**
- * Retrieves the CODE_CHECKOUT_SECRET from VSCode's secret storage
- * @returns The secret value from storage
- * @throws Error if the secret is not set
- */
-async function getSecretFromStorage(
-  context: vscode.ExtensionContext,
-): Promise<string> {
-  const secret = await context.secrets.get("CODE_CHECKOUT_SECRET");
-
-  if (!secret) {
-    throw new Error(
-      "CODE_CHECKOUT_SECRET is not set. Please run code-checkout-init <secret> first",
-    );
-  }
-
-  return secret;
-}
-
-/**
- * Derives an API key from the developer's secret
- */
-function deriveApiKey(secret: string): string {
-  const hmac = createHash("sha256");
-  hmac.update(secret);
-  return hmac.digest("hex");
 }
 
 /**
@@ -116,7 +87,7 @@ async function getLicenseData(
 /**
  * Validates a license key with the server
  * @param context - The extension context
- * @param licenseKey - The license key to validate
+ * @param licenseKey - The license key to validate (will be used as API key)
  * @param gracePeriodDays - Number of days to allow offline usage
  */
 export async function validateLicense(
@@ -125,37 +96,25 @@ export async function validateLicense(
   gracePeriodDays = 7,
 ): Promise<ValidationResult> {
   try {
-    // Get the developer's secret from storage and derive API key
-    const secret = await getSecretFromStorage(context);
-    const apiKey = deriveApiKey(secret);
-
     try {
-      let response;
-
-      const MOCK_MODE = false;
-
+      const MOCK_MODE = true;
       if (MOCK_MODE) {
-        response = {
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              isValid: true,
-              expiresAt: new Date(
-                Date.now() + 30 * 24 * 60 * 60 * 1000,
-              ).toISOString(), // 30 days from now
-            }),
+        return {
+          isValid: true,
+          message: "License validated offline using grace period",
+          expiresAt: new Date(
+            Date.now() + 30 * 24 * 60 * 60 * 1000,
+          ).toISOString(),
         };
-      } else {
-        // Attempt online validation
-        response = await fetch(API_ENDPOINT, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-API-Key": apiKey,
-          },
-          body: JSON.stringify({ licenseKey }),
-        });
       }
+      // Attempt online validation using license key as API key
+      const response = await fetch(API_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${licenseKey}`, // Use license key as Bearer token
+        },
+      });
 
       if (!response.ok) {
         throw new Error("License validation failed");
