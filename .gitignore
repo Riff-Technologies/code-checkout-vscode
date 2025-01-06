@@ -131,3 +131,6 @@ dist
 
 # build
 build/
+
+# Linting and formatting
+.eslintcache

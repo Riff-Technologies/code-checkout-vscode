@@ -7,7 +7,7 @@ import { validateLicense } from "../private/license-validator";
  */
 function getExtensionInfo(
   extensionPath: string,
-  commandName: string
+  commandName: string,
 ): {
   commandId: string;
   packageName: string;
@@ -20,7 +20,7 @@ function getExtensionInfo(
     };
   } catch (error) {
     throw new Error(
-      `Failed to determine command ID from package.json: ${error}`
+      `Failed to determine command ID from package.json: ${error}`,
     );
   }
 }
@@ -36,12 +36,12 @@ async function handleLicenseValidationResult(result: {
 }): Promise<boolean> {
   if (result.isValid) {
     await vscode.window.showInformationMessage(
-      "License activated successfully!"
+      "License activated successfully!",
     );
     return true;
   } else {
     await vscode.window.showErrorMessage(
-      `License validation failed: ${result.message || "Invalid license"}`
+      `License validation failed: ${result.message || "Invalid license"}`,
     );
     return false;
   }
@@ -52,20 +52,24 @@ async function handleLicenseValidationResult(result: {
  */
 async function handleUri(
   uri: vscode.Uri,
-  context: vscode.ExtensionContext
+  context: vscode.ExtensionContext,
 ): Promise<void> {
   try {
     const params = new URLSearchParams(uri.query);
 
+    const handleActivate = async () => {
+      const licenseKey = params.get("key");
+      if (!licenseKey) {
+        throw new Error("No license key provided");
+      }
+
+      const result = await validateLicense(context, licenseKey);
+      await handleLicenseValidationResult(result);
+    };
+
     switch (uri.path) {
       case "/activate":
-        const licenseKey = params.get("key");
-        if (!licenseKey) {
-          throw new Error("No license key provided");
-        }
-
-        const result = await validateLicense(context, licenseKey);
-        await handleLicenseValidationResult(result);
+        await handleActivate();
         break;
 
       default:
@@ -77,7 +81,7 @@ async function handleUri(
     await vscode.window.showErrorMessage(
       `Failed to process the request: ${
         error instanceof Error ? error.message : "Unknown error"
-      }`
+      }`,
     );
   }
 }
@@ -86,7 +90,7 @@ async function handleUri(
  * Injects the activate command into the extension
  */
 export function injectCheckoutCommands(
-  originalActivate: (context: vscode.ExtensionContext) => void
+  originalActivate: (context: vscode.ExtensionContext) => void,
 ) {
   return async (context: vscode.ExtensionContext) => {
     // Call the original activate function
@@ -95,7 +99,7 @@ export function injectCheckoutCommands(
     try {
       const { commandId } = getExtensionInfo(
         context.extensionPath,
-        "activateLicenseCommand"
+        "activateLicenseCommand",
       );
 
       // Register URI handler
@@ -104,7 +108,7 @@ export function injectCheckoutCommands(
           handleUri: async (uri: vscode.Uri) => {
             await handleUri(uri, context);
           },
-        })
+        }),
       );
 
       // Register command for manual activation
@@ -132,10 +136,10 @@ export function injectCheckoutCommands(
             await vscode.window.showErrorMessage(
               `Failed to validate license: ${
                 error instanceof Error ? error.message : "Unknown error"
-              }`
+              }`,
             );
           }
-        })
+        }),
       );
     } catch (error) {
       console.error("Failed to initialize license management:", error);
@@ -151,10 +155,10 @@ export function withActivateCommand() {
   return function (
     _target: unknown,
     _propertyKey: string,
-    descriptor: PropertyDescriptor
+    descriptor: PropertyDescriptor,
   ) {
     const originalActivate = descriptor.value as (
-      context: vscode.ExtensionContext
+      context: vscode.ExtensionContext,
     ) => void;
     descriptor.value = injectCheckoutCommands(originalActivate);
     return descriptor;

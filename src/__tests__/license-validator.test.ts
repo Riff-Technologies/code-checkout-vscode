@@ -6,7 +6,6 @@ import {
   needsOnlineValidation,
 } from "../private/license-validator";
 import * as fs from "fs";
-import * as path from "path";
 
 // Mock VSCode extension context
 const mockContext: vscode.ExtensionContext = {
@@ -33,7 +32,7 @@ describe("License Validator", () => {
     // Setup default mock implementations
     (fs.existsSync as jest.Mock).mockReturnValue(true);
     (fs.readFileSync as jest.Mock).mockReturnValue(
-      'CODE_CHECKOUT_SECRET="test-secret"'
+      'CODE_CHECKOUT_SECRET="test-secret"',
     );
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
@@ -41,7 +40,7 @@ describe("License Validator", () => {
         Promise.resolve({
           isValid: true,
           expiresAt: new Date(
-            Date.now() + 30 * 24 * 60 * 60 * 1000
+            Date.now() + 30 * 24 * 60 * 60 * 1000,
           ).toISOString(), // 30 days from now
         }),
     });
@@ -80,10 +79,10 @@ describe("License Validator", () => {
       // Mock stored license data
       const storedKey = "stored-key";
       const futureDate = new Date(
-        Date.now() + 30 * 24 * 60 * 60 * 1000
+        Date.now() + 30 * 24 * 60 * 60 * 1000,
       ).toISOString();
       const recentDate = new Date(
-        Date.now() - 1 * 24 * 60 * 60 * 1000
+        Date.now() - 1 * 24 * 60 * 60 * 1000,
       ).toISOString();
 
       (mockContext.secrets.get as jest.Mock).mockImplementation(
@@ -98,7 +97,7 @@ describe("License Validator", () => {
             default:
               return Promise.resolve(null);
           }
-        }
+        },
       );
 
       const result = await validateLicense(mockContext, storedKey);
@@ -114,10 +113,10 @@ describe("License Validator", () => {
       // Mock stored license data with old validation date
       const storedKey = "stored-key";
       const futureDate = new Date(
-        Date.now() + 30 * 24 * 60 * 60 * 1000
+        Date.now() + 30 * 24 * 60 * 60 * 1000,
       ).toISOString();
       const oldDate = new Date(
-        Date.now() - 8 * 24 * 60 * 60 * 1000
+        Date.now() - 8 * 24 * 60 * 60 * 1000,
       ).toISOString(); // 8 days old
 
       (mockContext.secrets.get as jest.Mock).mockImplementation(
@@ -132,7 +131,7 @@ describe("License Validator", () => {
             default:
               return Promise.resolve(null);
           }
-        }
+        },
       );
 
       const result = await validateLicense(mockContext, storedKey);
@@ -177,7 +176,7 @@ describe("License Validator", () => {
             default:
               return Promise.resolve(null);
           }
-        }
+        },
       );
 
       const result = await isLicenseExpired(mockContext);
@@ -187,7 +186,7 @@ describe("License Validator", () => {
 
     it("should return false for valid license", async () => {
       const futureDate = new Date(
-        Date.now() + 24 * 60 * 60 * 1000
+        Date.now() + 24 * 60 * 60 * 1000,
       ).toISOString(); // 1 day from now
       (mockContext.secrets.get as jest.Mock).mockImplementation(
         (key: string) => {
@@ -201,7 +200,7 @@ describe("License Validator", () => {
             default:
               return Promise.resolve(null);
           }
-        }
+        },
       );
 
       const result = await isLicenseExpired(mockContext);
@@ -213,7 +212,7 @@ describe("License Validator", () => {
   describe("needsOnlineValidation", () => {
     it("should return true when last validation is beyond grace period", async () => {
       const oldDate = new Date(
-        Date.now() - 8 * 24 * 60 * 60 * 1000
+        Date.now() - 8 * 24 * 60 * 60 * 1000,
       ).toISOString(); // 8 days ago
       (mockContext.secrets.get as jest.Mock).mockImplementation(
         (key: string) => {
@@ -227,7 +226,7 @@ describe("License Validator", () => {
             default:
               return Promise.resolve(null);
           }
-        }
+        },
       );
 
       const result = await needsOnlineValidation(mockContext);
@@ -237,7 +236,7 @@ describe("License Validator", () => {
 
     it("should return false when last validation is within grace period", async () => {
       const recentDate = new Date(
-        Date.now() - 1 * 24 * 60 * 60 * 1000
+        Date.now() - 1 * 24 * 60 * 60 * 1000,
       ).toISOString(); // 1 day ago
       (mockContext.secrets.get as jest.Mock).mockImplementation(
         (key: string) => {
@@ -251,7 +250,7 @@ describe("License Validator", () => {
             default:
               return Promise.resolve(null);
           }
-        }
+        },
       );
 
       const result = await needsOnlineValidation(mockContext);
