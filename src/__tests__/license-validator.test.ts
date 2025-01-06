@@ -5,7 +5,6 @@ import {
   isLicenseExpired,
   needsOnlineValidation,
 } from "../private/license-validator";
-import * as fs from "fs";
 
 // Mock VSCode extension context
 const mockContext: vscode.ExtensionContext = {
@@ -29,11 +28,16 @@ global.fetch = jest.fn();
 describe("License Validator", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Setup default mock implementations
-    (fs.existsSync as jest.Mock).mockReturnValue(true);
-    (fs.readFileSync as jest.Mock).mockReturnValue(
-      'CODE_CHECKOUT_SECRET="test-secret"',
-    );
+
+    // Mock the secret in VSCode storage
+    (mockContext.secrets.get as jest.Mock).mockImplementation((key: string) => {
+      if (key === "CODE_CHECKOUT_SECRET") {
+        return Promise.resolve("test-secret");
+      }
+      return Promise.resolve(undefined);
+    });
+
+    // Mock fetch response
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () =>
@@ -41,17 +45,37 @@ describe("License Validator", () => {
           isValid: true,
           expiresAt: new Date(
             Date.now() + 30 * 24 * 60 * 60 * 1000,
-          ).toISOString(), // 30 days from now
+          ).toISOString(),
         }),
     });
   });
 
   describe("validateLicense", () => {
+    it("should fail if secret is not in storage", async () => {
+      // Override the mock to return no secret
+      (mockContext.secrets.get as jest.Mock).mockImplementation(() =>
+        Promise.resolve(undefined),
+      );
+
+      await expect(validateLicense(mockContext, "valid-key")).rejects.toThrow(
+        "CODE_CHECKOUT_SECRET is not set",
+      );
+    });
+
     it("should validate a license successfully online", async () => {
       const result = await validateLicense(mockContext, "valid-key");
 
       expect(result.isValid).toBe(true);
       expect(global.fetch).toHaveBeenCalledTimes(1);
+      // Verify API key derivation by checking fetch headers
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            "X-API-Key": expect.any(String),
+          }),
+        }),
+      );
       expect(mockContext.secrets.store).toHaveBeenCalledTimes(3); // Stores key, expiry, and last validated
     });
 
@@ -88,6 +112,8 @@ describe("License Validator", () => {
       (mockContext.secrets.get as jest.Mock).mockImplementation(
         (key: string) => {
           switch (key) {
+            case "CODE_CHECKOUT_SECRET":
+              return Promise.resolve("test-secret");
             case "license-key":
               return Promise.resolve(storedKey);
             case "license-expires":
@@ -117,11 +143,13 @@ describe("License Validator", () => {
       ).toISOString();
       const oldDate = new Date(
         Date.now() - 8 * 24 * 60 * 60 * 1000,
-      ).toISOString(); // 8 days old
+      ).toISOString();
 
       (mockContext.secrets.get as jest.Mock).mockImplementation(
         (key: string) => {
           switch (key) {
+            case "CODE_CHECKOUT_SECRET":
+              return Promise.resolve("test-secret");
             case "license-key":
               return Promise.resolve(storedKey);
             case "license-expires":
@@ -144,7 +172,14 @@ describe("License Validator", () => {
   describe("getStoredLicense", () => {
     it("should return stored license key", async () => {
       const storedKey = "stored-key";
-      (mockContext.secrets.get as jest.Mock).mockResolvedValue(storedKey);
+      (mockContext.secrets.get as jest.Mock).mockImplementation(
+        (key: string) => {
+          if (key === "license-key") {
+            return Promise.resolve(storedKey);
+          }
+          return Promise.resolve("test-secret"); // Keep the secret available
+        },
+      );
 
       const result = await getStoredLicense(mockContext);
 

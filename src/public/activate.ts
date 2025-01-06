@@ -88,13 +88,23 @@ async function handleUri(
 
 /**
  * Injects the activate command into the extension
+ * @param secret - The secret used for license validation
+ * @param originalActivate - The original activate function
  */
 export function injectCheckoutCommands(
+  secret: string,
   originalActivate: (context: vscode.ExtensionContext) => void,
 ) {
   return async (context: vscode.ExtensionContext) => {
-    // Call the original activate function
-    originalActivate(context);
+    // Store the secret in VSCode's secret storage
+    await context.secrets.store("CODE_CHECKOUT_SECRET", secret);
+
+    const storedSecret = await context.secrets.get("CODE_CHECKOUT_SECRET");
+
+    console.log(`Stored secret: ${storedSecret}`);
+    if (!storedSecret) {
+      throw new Error("Failed to store secret in VSCode's secret storage");
+    }
 
     try {
       const { commandId } = getExtensionInfo(
@@ -144,14 +154,18 @@ export function injectCheckoutCommands(
     } catch (error) {
       console.error("Failed to initialize license management:", error);
       throw error;
+    } finally {
+      // Call the original activate function
+      originalActivate(context);
     }
   };
 }
 
 /**
  * Decorator that automatically injects commands
+ * @param secret - The secret used for license validation
  */
-export function withActivateCommand() {
+export function withActivateCommand(secret: string) {
   return function (
     _target: unknown,
     _propertyKey: string,
@@ -160,7 +174,7 @@ export function withActivateCommand() {
     const originalActivate = descriptor.value as (
       context: vscode.ExtensionContext,
     ) => void;
-    descriptor.value = injectCheckoutCommands(originalActivate);
+    descriptor.value = injectCheckoutCommands(secret, originalActivate);
     return descriptor;
   };
 }

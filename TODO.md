@@ -48,3 +48,15 @@
 - [ ] test URI for opening the extension via URL
   - [ ] test it also when the extension has existing URI functionality - will it overwrite what's there?
 - [ ] test with all the various kinds of extensions (run `npx --package yo --package generator-code -- yo code` to see them)
+
+## Notes
+
+- [ ] the parent extension project has to have `dotenv` installed and configured
+
+```
+  import * as dotenv from "dotenv";
+  import * as path from "path";
+
+  // Load .env file at the root of your project
+  dotenv.config({ path: path.join(__dirname, "..", ".env") });
+```

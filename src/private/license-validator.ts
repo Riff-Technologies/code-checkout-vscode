@@ -1,6 +1,4 @@
 import * as vscode from "vscode";
-import * as fs from "fs";
-import * as path from "path";
 import { createHash } from "crypto";
 
 const API_ENDPOINT = "https://api.riff.codes/validate-license"; // Your actual API endpoint
@@ -44,25 +42,22 @@ export interface Storage {
 }
 
 /**
- * Gets the secret from the extension's .env file
+ * Retrieves the CODE_CHECKOUT_SECRET from VSCode's secret storage
+ * @returns The secret value from storage
+ * @throws Error if the secret is not set
  */
-function getSecretFromEnv(extensionPath: string): string {
-  const envPath = path.join(extensionPath, ".env");
-  if (!fs.existsSync(envPath)) {
+async function getSecretFromStorage(
+  context: vscode.ExtensionContext,
+): Promise<string> {
+  const secret = await context.secrets.get("CODE_CHECKOUT_SECRET");
+
+  if (!secret) {
     throw new Error(
-      ".env file not found. Please run code-checkout-init <secret> first"
+      "CODE_CHECKOUT_SECRET is not set. Please run code-checkout-init <secret> first",
     );
   }
 
-  const envContent = fs.readFileSync(envPath, "utf-8");
-  const match = envContent.match(/CODE_CHECKOUT_SECRET=["']?([^"'\n]+)["']?/);
-  if (!match) {
-    throw new Error(
-      "CODE_CHECKOUT_SECRET not found in .env file. Please run code-checkout-init <secret> first"
-    );
-  }
-
-  return match[1];
+  return secret;
 }
 
 /**
@@ -79,7 +74,7 @@ function deriveApiKey(secret: string): string {
  */
 async function storeLicenseData(
   context: vscode.ExtensionContext,
-  data: LicenseData
+  data: LicenseData,
 ): Promise<void> {
   await context.secrets.store("license-key", data.key);
   await context.secrets.store("license-expires", data.expiresAt);
@@ -90,7 +85,7 @@ async function storeLicenseData(
  * Clears stored license data
  */
 async function clearLicenseData(
-  context: vscode.ExtensionContext
+  context: vscode.ExtensionContext,
 ): Promise<void> {
   await context.secrets.delete("license-key");
   await context.secrets.delete("license-expires");
@@ -101,7 +96,7 @@ async function clearLicenseData(
  * Gets stored license data
  */
 async function getLicenseData(
-  context: vscode.ExtensionContext
+  context: vscode.ExtensionContext,
 ): Promise<LicenseData | null> {
   const key = await context.secrets.get("license-key");
   const expiresAt = await context.secrets.get("license-expires");
@@ -127,23 +122,40 @@ async function getLicenseData(
 export async function validateLicense(
   context: vscode.ExtensionContext,
   licenseKey: string,
-  gracePeriodDays = 7
+  gracePeriodDays = 7,
 ): Promise<ValidationResult> {
   try {
-    // Get the developer's secret and derive API key
-    const secret = getSecretFromEnv(context.extensionPath);
+    // Get the developer's secret from storage and derive API key
+    const secret = await getSecretFromStorage(context);
     const apiKey = deriveApiKey(secret);
 
     try {
-      // Attempt online validation
-      const response = await fetch(API_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-API-Key": apiKey,
-        },
-        body: JSON.stringify({ licenseKey }),
-      });
+      let response;
+
+      const MOCK_MODE = false;
+
+      if (MOCK_MODE) {
+        response = {
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              isValid: true,
+              expiresAt: new Date(
+                Date.now() + 30 * 24 * 60 * 60 * 1000,
+              ).toISOString(), // 30 days from now
+            }),
+        };
+      } else {
+        // Attempt online validation
+        response = await fetch(API_ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-Key": apiKey,
+          },
+          body: JSON.stringify({ licenseKey }),
+        });
+      }
 
       if (!response.ok) {
         throw new Error("License validation failed");
@@ -222,7 +234,7 @@ export async function validateLicense(
     throw new Error(
       `Failed to validate license: ${
         error instanceof Error ? error.message : "Unknown error"
-      }`
+      }`,
     );
   }
 }
@@ -231,7 +243,7 @@ export async function validateLicense(
  * Gets the stored license key if any
  */
 export async function getStoredLicense(
-  context: vscode.ExtensionContext
+  context: vscode.ExtensionContext,
 ): Promise<string | undefined> {
   return context.secrets.get("license-key");
 }
@@ -240,7 +252,7 @@ export async function getStoredLicense(
  * Checks if the stored license is expired
  */
 export async function isLicenseExpired(
-  context: vscode.ExtensionContext
+  context: vscode.ExtensionContext,
 ): Promise<boolean> {
   const data = await getLicenseData(context);
   if (!data) {
@@ -256,7 +268,7 @@ export async function isLicenseExpired(
  */
 export async function needsOnlineValidation(
   context: vscode.ExtensionContext,
-  gracePeriodDays = 7
+  gracePeriodDays = 7,
 ): Promise<boolean> {
   const data = await getLicenseData(context);
   if (!data) {

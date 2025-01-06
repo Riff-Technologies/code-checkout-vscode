@@ -32,7 +32,7 @@ function getExtensionInfo(): { name: string; displayName: string } {
   }
 
   const packageJson: PackageJson = JSON.parse(
-    fs.readFileSync(packageJsonPath, "utf-8")
+    fs.readFileSync(packageJsonPath, "utf-8"),
   );
 
   if (!packageJson.name) {
@@ -43,84 +43,6 @@ function getExtensionInfo(): { name: string; displayName: string } {
     name: packageJson.name,
     displayName: packageJson.displayName || packageJson.name,
   };
-}
-
-/**
- * Validates and processes command line arguments
- * @returns The secret provided as a command line argument
- * @throws Error if secret is not provided
- */
-function getSecretFromArgs(): string {
-  const args = process.argv.slice(2);
-  if (args.length === 0) {
-    throw new Error(
-      "Secret parameter is required. Usage: code-checkout-install <secret>"
-    );
-  }
-  return args[0];
-}
-
-/**
- * Ensures .env file exists and updates the secret while preserving other variables
- * @param secret The secret to store in .env
- */
-function updateEnvFile(secret: string): void {
-  const envPath = path.join(process.cwd(), ".env");
-  let envContent = "";
-  const secretKey = "CODE_CHECKOUT_SECRET";
-
-  // Read existing .env content if it exists
-  if (fs.existsSync(envPath)) {
-    envContent = fs.readFileSync(envPath, "utf-8");
-  }
-
-  // Split content into lines and parse existing variables
-  const envLines = envContent.split("\n").filter(Boolean);
-  const envVars = new Map<string, string>();
-
-  // Parse existing variables
-  for (const line of envLines) {
-    const match = line.match(/^([^=]+)=(.*)$/);
-    if (match) {
-      const [, key, value] = match;
-      envVars.set(key.trim(), value.trim());
-    }
-  }
-
-  // Update or add the secret
-  envVars.set(secretKey, `"${secret}"`);
-
-  // Convert back to .env format
-  const newContent = Array.from(envVars.entries())
-    .map(([key, value]) => `${key}=${value}`)
-    .join("\n");
-
-  fs.writeFileSync(envPath, `${newContent}\n`, "utf-8");
-  console.log(
-    `Successfully ${
-      envVars.has(secretKey) ? "updated" : "added"
-    } ${secretKey} in .env file`
-  );
-}
-
-/**
- * Ensures .vscodeignore exists and contains .env
- */
-function updateVSCodeIgnore(): void {
-  const vscodeignorePath = path.join(process.cwd(), ".vscodeignore");
-  let content = "";
-
-  // Read existing content if file exists
-  if (fs.existsSync(vscodeignorePath)) {
-    content = fs.readFileSync(vscodeignorePath, "utf-8");
-  }
-
-  // Add .env if not already present
-  if (!content.includes(".env")) {
-    content = `${content.trim()}\n.env\n`;
-    fs.writeFileSync(vscodeignorePath, content, "utf-8");
-    console.log("Added .env to .vscodeignore");
-  }
 }
 
 /**
@@ -150,10 +72,6 @@ function ensurePostCompileScript(packageJsonPath: string): boolean {
  */
 function updatePackageJson(): void {
   try {
-    const secret = getSecretFromArgs();
-    updateEnvFile(secret);
-    updateVSCodeIgnore();
-
     const { name, displayName } = getExtensionInfo();
     const packageJsonPath = path.join(process.cwd(), "package.json");
 
@@ -164,7 +82,7 @@ function updatePackageJson(): void {
     }
 
     const packageJson: PackageJson = JSON.parse(
-      fs.readFileSync(packageJsonPath, "utf-8")
+      fs.readFileSync(packageJsonPath, "utf-8"),
     );
 
     // Initialize contributes if it doesn't exist
@@ -185,7 +103,7 @@ function updatePackageJson(): void {
 
     // Check if command already exists
     const commandExists = packageJson.contributes.commands.some(
-      (cmd) => cmd.command === newCommand.command
+      (cmd) => cmd.command === newCommand.command,
     );
 
     if (!commandExists) {
@@ -212,7 +130,7 @@ function updatePackageJson(): void {
     fs.writeFileSync(
       packageJsonPath,
       `${JSON.stringify(packageJson, null, 2)}\n`,
-      "utf-8"
+      "utf-8",
     );
 
     console.log(`Successfully updated package.json configuration`);
