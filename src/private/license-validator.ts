@@ -106,24 +106,29 @@ export async function validateLicense(
 ): Promise<ValidationResult> {
   try {
     try {
+      let response: Response | undefined;
+
       const MOCK_MODE = true;
       if (MOCK_MODE) {
-        return {
-          isValid: true,
-          message: "License validated offline using grace period",
-          expiresAt: new Date(
-            Date.now() + 30 * 24 * 60 * 60 * 1000,
-          ).toISOString(),
-        };
+        response = new Response(
+          JSON.stringify({
+            isValid: true,
+            message: "License validated offline using grace period",
+            expiresAt: new Date(
+              Date.now() + 30 * 24 * 60 * 60 * 1000,
+            ).toISOString(),
+          }),
+        );
+      } else {
+        // Attempt online validation using license key as API key
+        response = await fetch(API_ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${licenseKey}`, // Use license key as Bearer token
+          },
+        });
       }
-      // Attempt online validation using license key as API key
-      const response = await fetch(API_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${licenseKey}`, // Use license key as Bearer token
-        },
-      });
 
       if (!response.ok) {
         throw new Error("License validation failed");
