@@ -26,3 +26,5 @@
 
 - `build.ts` is run as part of the `postcompile` script
   - it only obfuscates the javascript code after it is compiled by `tsc`
+
+### Licensing

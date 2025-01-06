@@ -108,6 +108,7 @@ export async function validateLicense(
     try {
       let response: Response | undefined;
 
+      // TODO: remove this mock mode
       const MOCK_MODE = true;
       if (MOCK_MODE) {
         response = new Response(
