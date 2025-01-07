@@ -37,3 +37,4 @@
   - if it's not present nor valid, then we prompt the user accordingly
   - TODO: we need to implement a prompt that makes sense here
 - the license key itself is used as authentication to the server
+- the website can open the app directly because we're passing the app URI (vscode, cursor) as a param on the request to activate online

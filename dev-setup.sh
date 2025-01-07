@@ -79,7 +79,7 @@ echo "Installed riff-code-checkout-$new_version.tgz"
 
 # Run code-checkout-init
 echo "Initializing code-checkout..."
-npx code-checkout-init my-secret
+npx code-checkout-init
 echo "Initialized code-checkout"
 
 # Run yarn package
