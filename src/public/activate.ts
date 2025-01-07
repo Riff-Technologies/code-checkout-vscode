@@ -95,6 +95,40 @@ export function injectCheckoutCommands(
 ) {
   return async (context: vscode.ExtensionContext) => {
     try {
+      let handlerRegistered = false;
+      const originalRegisterUriHandler = vscode.window.registerUriHandler;
+
+      (vscode.window.registerUriHandler as any) = (
+        handler: vscode.UriHandler,
+      ) => {
+        handlerRegistered = true;
+        const originalHandleUri = handler.handleUri;
+        handler.handleUri = async (uri: vscode.Uri) => {
+          if (uri.path === "/activate") {
+            await handleUri(uri, context);
+          } else {
+            await originalHandleUri.call(handler, uri);
+          }
+        };
+
+        return originalRegisterUriHandler.call(vscode.window, handler);
+      };
+
+      originalActivate(context);
+
+      vscode.window.registerUriHandler = originalRegisterUriHandler;
+
+      // Register our own handler if none was registered
+      if (!handlerRegistered) {
+        context.subscriptions.push(
+          vscode.window.registerUriHandler({
+            handleUri: async (uri: vscode.Uri) => {
+              await handleUri(uri, context);
+            },
+          }),
+        );
+      }
+
       const { commandId: activateLicenseCommandId } = getExtensionInfo(
         context.extensionPath,
         "activateLicenseCommand",
@@ -106,15 +140,6 @@ export function injectCheckoutCommands(
       const { commandId: activateOnlineCommandId } = getExtensionInfo(
         context.extensionPath,
         "activateOnlineCommand",
-      );
-
-      // Register URI handler
-      context.subscriptions.push(
-        vscode.window.registerUriHandler({
-          handleUri: async (uri: vscode.Uri) => {
-            await handleUri(uri, context);
-          },
-        }),
       );
 
       // Register command for manual activation
@@ -167,9 +192,6 @@ export function injectCheckoutCommands(
     } catch (error) {
       console.error("Failed to initialize license management:", error);
       throw error;
-    } finally {
-      // Call the original activate function
-      originalActivate(context);
     }
   };
 }

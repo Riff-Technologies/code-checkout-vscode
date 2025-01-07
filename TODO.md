@@ -15,8 +15,9 @@
   - [ ] support bundling the extension (esbundle or webpack)
 - [ ] if any part of the scripts fail, it should show steps to complete it manually
   - [ ] it should try to log errors
-- [ ] add `.env` file to `.gitignore` on init
-- [ ] rename `injectActivateCommand` to `injectCheckoutCommands`
+- [ ] determine a way to pull the extension commands from the server, instead of being loaded in the `.vsix` file
+- [ ] wrap all commands with analytics, if it's added as an option
+- [ ] add support for free trial to license
 
 ## Documentation
 
@@ -50,3 +51,5 @@
   // Load .env file at the root of your project
   dotenv.config({ path: path.join(__dirname, "..", ".env") });
 ```
+
+- [ ] test activation via uri handler: `cursor://riff.testmystuff/activate?key=123`

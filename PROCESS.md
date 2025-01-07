@@ -12,6 +12,7 @@
     - `revokeLicenseCommand` will clear out that license key
     - `activateOnlineCommand` will take the user to a website: `https://my-website/{publisher.extensionId}/activate`
       - TODO: this website should redirect back to vscode and pass a value into the `activateLicenseCommand`
+      - the web will try to open `cursor://riff.testmystuff/test`
 
 ### Tagging
 
@@ -28,3 +29,11 @@
   - it only obfuscates the javascript code after it is compiled by `tsc`
 
 ### Licensing
+
+- the license is added manually by the user, or automatically when the website redirects back to vscode via `activateLicenseCommand`
+- the license key is saved to vscode secret storage along with its expiration and the date it was last validated
+- there's a 7 day grace period to use the license from the time it was last validated online, if there's no internet connection or the server cannot be reached
+- when a command is run that requires a license, it is validated
+  - if it's not present nor valid, then we prompt the user accordingly
+  - TODO: we need to implement a prompt that makes sense here
+- the license key itself is used as authentication to the server

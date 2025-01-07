@@ -3,7 +3,6 @@ import {
   validateLicense,
   getStoredLicense,
   isLicenseExpired,
-  needsOnlineValidation,
 } from "../private/license-validator";
 
 /**
@@ -59,17 +58,14 @@ export function tagFunction<T extends (...args: any[]) => any>(
         return undefined as UnwrapPromise<ReturnType<T>>;
       }
 
-      // Check if we need to validate online
-      const needsValidation = await needsOnlineValidation(context);
-      if (needsValidation) {
-        const validationResult = await validateLicense(context, licenseKey);
-        if (!validationResult.isValid) {
-          await showActivationPrompt(
-            validationResult.message || "Your license is invalid.",
-            extensionName,
-          );
-          return undefined as UnwrapPromise<ReturnType<T>>;
-        }
+      // Validate the license
+      const validationResult = await validateLicense(context, licenseKey);
+      if (!validationResult.isValid) {
+        await showActivationPrompt(
+          validationResult.message || "Your license is invalid.",
+          extensionName,
+        );
+        return undefined as UnwrapPromise<ReturnType<T>>;
       }
 
       // Execute the original function and handle both sync and async results
