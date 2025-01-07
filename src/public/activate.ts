@@ -222,15 +222,12 @@ async function activateLicenseOnline(
   context: vscode.ExtensionContext,
 ): Promise<void> {
   try {
-    // Get the extension ID (publisher.name)
     const { id: extensionId } = context.extension;
-
-    // Construct and encode the activation URL
+    const appScheme = vscode.env.uriScheme;
     const activationUrl = new URL(
-      `https://mywebsite.com/${extensionId}/activate`,
+      `https://mywebsite.com/${extensionId}/activate?app=${appScheme}`,
     );
 
-    // Open the URL in the default web browser
     await vscode.env.openExternal(vscode.Uri.parse(activationUrl.toString()));
   } catch (error) {
     const errorMessage =

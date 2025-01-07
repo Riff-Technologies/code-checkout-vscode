@@ -1,8 +1,8 @@
 # TODO
 
-- [ ] adding license from web
-  - [ ] should be able to determine which IDE is being used `vscode` or `cursor` or something else
-    - [ ] vscode://riff.testmystuff/activate?key=my-key
+- [x] adding license from web
+  - [x] should be able to determine which IDE is being used `vscode` or `cursor` or something else
+    - [x] vscode://riff.testmystuff/activate?key=my-key
 - [ ] Build tools
   - [ ] add an option to obfuscate the source code when executing the script
   - [x] Build the extension and obfuscate the JS code
@@ -18,6 +18,7 @@
 - [ ] determine a way to pull the extension commands from the server, instead of being loaded in the `.vsix` file
 - [ ] wrap all commands with analytics, if it's added as an option
 - [ ] add support for free trial to license
+- [ ] consider registering each "tagged function" on the website, so that it can be configured remotely
 
 ## Documentation
 

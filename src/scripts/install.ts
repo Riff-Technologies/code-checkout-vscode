@@ -109,7 +109,6 @@ function updatePackageJson(): void {
     const activateOnlineCommand: VSCodeCommand = {
       command: `${name}.activateOnlineCommand`,
       title: `${displayName}: Activate License Online`,
-      category: "Extension Management",
     };
 
     const commands = [
