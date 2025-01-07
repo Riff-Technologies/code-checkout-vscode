@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import * as os from "os";
+import * as crypto from "crypto";
 
 const API_ENDPOINT = "https://api.riff.codes/validate-license"; // Your actual API endpoint
 
@@ -13,6 +15,31 @@ interface LicenseData {
   key: string;
   expiresAt: string;
   lastValidated: string;
+  machineId: string;
+}
+
+/**
+ * Generates a unique machine identifier based on hardware information
+ * This ID will persist across extension reinstalls
+ */
+async function generateMachineId(): Promise<string> {
+  // Combine multiple system-specific values
+  const values = [
+    os.hostname(),
+    os.platform(),
+    os.arch(),
+    os.cpus()[0]?.model || "",
+    os.totalmem().toString(),
+    // Get VSCode's machineId which is stable across VSCode reinstalls
+    vscode.env.machineId,
+    // Get VSCode's sessionId which is stable across extension reinstalls
+    vscode.env.sessionId,
+  ];
+
+  // Create a hash of the combined values
+  const hash = crypto.createHash("sha256");
+  values.forEach((value) => hash.update(value));
+  return hash.digest("hex");
 }
 
 /**
@@ -50,6 +77,7 @@ async function storeLicenseData(
   await context.secrets.store("license-key", data.key);
   await context.secrets.store("license-expires", data.expiresAt);
   await context.secrets.store("license-last-validated", data.lastValidated);
+  await context.secrets.store("license-machine-id", data.machineId);
 }
 
 /**
@@ -61,6 +89,7 @@ async function clearLicenseData(
   await context.secrets.delete("license-key");
   await context.secrets.delete("license-expires");
   await context.secrets.delete("license-last-validated");
+  await context.secrets.delete("license-machine-id");
 }
 
 /**
@@ -72,8 +101,9 @@ async function getLicenseData(
   const key = await context.secrets.get("license-key");
   const expiresAt = await context.secrets.get("license-expires");
   const lastValidated = await context.secrets.get("license-last-validated");
+  const machineId = await context.secrets.get("license-machine-id");
 
-  if (!key || !expiresAt || !lastValidated) {
+  if (!key || !expiresAt || !lastValidated || !machineId) {
     return null;
   }
 
@@ -81,6 +111,7 @@ async function getLicenseData(
     key,
     expiresAt,
     lastValidated,
+    machineId,
   };
 }
 
@@ -107,6 +138,7 @@ export async function validateLicense(
   try {
     try {
       let response: Response | undefined;
+      const machineId = await generateMachineId();
 
       // TODO: remove this mock mode
       const MOCK_MODE = true;
@@ -126,8 +158,19 @@ export async function validateLicense(
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${licenseKey}`, // Use license key as Bearer token
+            Authorization: `Bearer ${licenseKey}`,
           },
+          body: JSON.stringify({
+            machineId,
+            sessionId: vscode.env.sessionId,
+            // Include additional identifiers that might help prevent abuse
+            environment: {
+              vscodeVersion: vscode.version,
+              extensionVersion: context.extension.packageJSON.version,
+              platform: os.platform(),
+              release: os.release(),
+            },
+          }),
         });
       }
 
@@ -138,11 +181,12 @@ export async function validateLicense(
       const result = await response.json();
 
       if (result.isValid) {
-        // Store the license data
+        // Store the license data with machine ID
         await storeLicenseData(context, {
           key: licenseKey,
           expiresAt: result.expiresAt,
           lastValidated: new Date().toISOString(),
+          machineId,
         });
       } else {
         // Clear any existing license if validation failed
@@ -157,6 +201,7 @@ export async function validateLicense(
     } catch (networkError) {
       // Handle offline scenario
       const existingLicense = await getLicenseData(context);
+      const currentMachineId = await generateMachineId();
 
       // If there's no existing license data, we can't provide offline access
       if (!existingLicense) {
@@ -172,6 +217,14 @@ export async function validateLicense(
         return {
           isValid: false,
           message: "License key mismatch during offline validation",
+        };
+      }
+
+      // Verify machine ID matches to prevent license sharing
+      if (existingLicense.machineId !== currentMachineId) {
+        return {
+          isValid: false,
+          message: "License is not valid for this machine",
         };
       }
 

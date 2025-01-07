@@ -10,8 +10,8 @@
 - [ ] if any part of the scripts fail, it should show steps to complete it manually
   - [ ] it should try to log errors
   - [ ] comprehensive logging for how the package is working
-- [ ] wrap all commands with analytics, if it's added as an option
-- [ ] add support for free trial to license
+- [x] wrap all commands with analytics, if it's added as an option
+- [x] add support for free trial to license
 - [ ] consider registering each "tagged function" on the website, so that it can be configured remotely
 
 ## Documentation
