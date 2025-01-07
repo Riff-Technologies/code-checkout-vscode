@@ -1,6 +1,66 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { revokeLicense, validateLicense } from "../private/license-validator";
+import {
+  revokeLicense,
+  validateLicense,
+  getStoredLicense,
+} from "../private/license-validator";
+
+interface CommandAnalytics {
+  extensionId: string;
+  commandId: string;
+  timestamp: string;
+  hasValidLicense: boolean;
+}
+
+/**
+ * Tracks command execution analytics
+ * @param analytics - The analytics data to track
+ */
+async function trackCommandAnalytics(
+  analytics: CommandAnalytics,
+): Promise<void> {
+  try {
+    // TODO: Replace with your actual analytics endpoint
+    const ANALYTICS_ENDPOINT = "https://api.riff.codes/analytics/command";
+
+    await fetch(ANALYTICS_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(analytics),
+    });
+  } catch (error) {
+    // Silently fail analytics to not impact user experience
+    console.error("Failed to track analytics:", error);
+  }
+}
+
+/**
+ * Wraps a command to include analytics tracking
+ * @param context - The extension context
+ * @param commandId - The ID of the command being wrapped
+ * @param callback - The original command callback
+ */
+function wrapCommandWithAnalytics(
+  context: vscode.ExtensionContext,
+  commandId: string,
+  callback: (...args: any[]) => any,
+): (...args: any[]) => Promise<any> {
+  return async (...args: any[]) => {
+    const hasValidLicense = (await getStoredLicense(context)) !== undefined;
+
+    await trackCommandAnalytics({
+      extensionId: context.extension.id,
+      commandId,
+      timestamp: new Date().toISOString(),
+      hasValidLicense,
+    });
+
+    return callback(...args);
+  };
+}
 
 /**
  * Gets the command ID based on the extension's package.json
@@ -97,6 +157,26 @@ export function injectCheckoutCommands(
     try {
       let handlerRegistered = false;
       const originalRegisterUriHandler = vscode.window.registerUriHandler;
+      const originalRegisterCommand = vscode.commands.registerCommand;
+
+      // Override the command registration to add analytics
+      (vscode.commands.registerCommand as any) = (
+        commandId: string,
+        callback: (...args: any[]) => any,
+        thisArg?: any,
+      ) => {
+        const wrappedCallback = wrapCommandWithAnalytics(
+          context,
+          commandId,
+          callback,
+        );
+        return originalRegisterCommand.call(
+          vscode.commands,
+          commandId,
+          wrappedCallback,
+          thisArg,
+        );
+      };
 
       (vscode.window.registerUriHandler as any) = (
         handler: vscode.UriHandler,
@@ -114,9 +194,12 @@ export function injectCheckoutCommands(
         return originalRegisterUriHandler.call(vscode.window, handler);
       };
 
+      // Call the original activate function
       originalActivate(context);
 
+      // Restore original functions
       vscode.window.registerUriHandler = originalRegisterUriHandler;
+      vscode.commands.registerCommand = originalRegisterCommand;
 
       // Register our own handler if none was registered
       if (!handlerRegistered) {
@@ -142,52 +225,73 @@ export function injectCheckoutCommands(
         "activateOnlineCommand",
       );
 
-      // Register command for manual activation
+      // Register command for manual activation with analytics
       context.subscriptions.push(
-        vscode.commands.registerCommand(activateLicenseCommandId, async () => {
-          const licenseKey = await vscode.window.showInputBox({
-            prompt: "Enter your license key",
-            placeHolder: "XXXX-XXXX-XXXX-XXXX",
-            ignoreFocusOut: true,
-            validateInput: (value: string) => {
-              return value.trim().length > 0
-                ? null
-                : "License key cannot be empty";
+        vscode.commands.registerCommand(
+          activateLicenseCommandId,
+          wrapCommandWithAnalytics(
+            context,
+            activateLicenseCommandId,
+            async () => {
+              const licenseKey = await vscode.window.showInputBox({
+                prompt: "Enter your license key",
+                placeHolder: "XXXX-XXXX-XXXX-XXXX",
+                ignoreFocusOut: true,
+                validateInput: (value: string) => {
+                  return value.trim().length > 0
+                    ? null
+                    : "License key cannot be empty";
+                },
+              });
+
+              if (!licenseKey) {
+                return; // User cancelled
+              }
+
+              try {
+                const result = await validateLicense(context, licenseKey);
+                await handleLicenseValidationResult(result);
+              } catch (error) {
+                await vscode.window.showErrorMessage(
+                  `Failed to validate license: ${
+                    error instanceof Error ? error.message : "Unknown error"
+                  }`,
+                );
+              }
             },
-          });
-
-          if (!licenseKey) {
-            return; // User cancelled
-          }
-
-          try {
-            const result = await validateLicense(context, licenseKey);
-            await handleLicenseValidationResult(result);
-          } catch (error) {
-            await vscode.window.showErrorMessage(
-              `Failed to validate license: ${
-                error instanceof Error ? error.message : "Unknown error"
-              }`,
-            );
-          }
-        }),
+          ),
+        ),
       );
 
-      // Register a command for revoking the license
+      // Register a command for revoking the license with analytics
       context.subscriptions.push(
-        vscode.commands.registerCommand(revokeLicenseCommandId, async () => {
-          await revokeLicense(context);
-          await vscode.window.showInformationMessage(
-            "License revoked successfully!",
-          );
-        }),
+        vscode.commands.registerCommand(
+          revokeLicenseCommandId,
+          wrapCommandWithAnalytics(
+            context,
+            revokeLicenseCommandId,
+            async () => {
+              await revokeLicense(context);
+              await vscode.window.showInformationMessage(
+                "License revoked successfully!",
+              );
+            },
+          ),
+        ),
       );
 
-      // Register a command for activating the license online
+      // Register a command for activating the license online with analytics
       context.subscriptions.push(
-        vscode.commands.registerCommand(activateOnlineCommandId, async () => {
-          await activateLicenseOnline(context);
-        }),
+        vscode.commands.registerCommand(
+          activateOnlineCommandId,
+          wrapCommandWithAnalytics(
+            context,
+            activateOnlineCommandId,
+            async () => {
+              await activateLicenseOnline(context);
+            },
+          ),
+        ),
       );
     } catch (error) {
       console.error("Failed to initialize license management:", error);
