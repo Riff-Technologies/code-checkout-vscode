@@ -35,7 +35,7 @@ describe("License Validator", () => {
       json: () =>
         Promise.resolve({
           isValid: true,
-          expiresAt: new Date(
+          expiresOn: new Date(
             Date.now() + 30 * 24 * 60 * 60 * 1000,
           ).toISOString(),
         }),

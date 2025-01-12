@@ -21,8 +21,7 @@ async function trackCommandAnalytics(
   analytics: CommandAnalytics,
 ): Promise<void> {
   try {
-    // TODO: Replace with your actual analytics endpoint
-    const ANALYTICS_ENDPOINT = "https://api.riff.codes/analytics/command";
+    const ANALYTICS_ENDPOINT = "https://api.riff-tech.com/v1/analytics/events";
 
     await fetch(ANALYTICS_ENDPOINT, {
       method: "POST",
@@ -235,7 +234,7 @@ export function injectCheckoutCommands(
             async () => {
               const licenseKey = await vscode.window.showInputBox({
                 prompt: "Enter your license key",
-                placeHolder: "XXXX-XXXX-XXXX-XXXX",
+                placeHolder: "XXXXXXXX-XXXXXXXXXXX",
                 ignoreFocusOut: true,
                 validateInput: (value: string) => {
                   return value.trim().length > 0

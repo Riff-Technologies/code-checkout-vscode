@@ -68,7 +68,7 @@ const options: LicenseValidationOptions = {
 try {
   const result = await licenseManager.validateLicense(
     "YOUR-LICENSE-KEY",
-    options
+    options,
   );
   if (result.wasOffline) {
     console.log("Using offline validation");
@@ -96,7 +96,7 @@ Your license validation API endpoint should return responses in the following fo
 interface LicenseValidationResponse {
   isValid: boolean;
   message?: string;
-  expiresAt: string;
+  expiresOn: string;
   isRevoked: boolean;
   gracePeriodMs: number;
 }

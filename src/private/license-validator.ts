@@ -2,18 +2,18 @@ import * as vscode from "vscode";
 import * as os from "os";
 import * as crypto from "crypto";
 
-const API_ENDPOINT = "https://api.riff.codes/validate-license"; // Your actual API endpoint
+const API_ENDPOINT = "https://api.riff-tech.com/v1/validate";
 
 interface ValidationResult {
   isValid: boolean;
   message?: string;
-  expiresAt?: string;
+  expiresOn?: string;
   offlineGracePeriodUsed?: boolean;
 }
 
 interface LicenseData {
   key: string;
-  expiresAt: string;
+  expiresOn: string;
   lastValidated: string;
   machineId: string;
 }
@@ -75,7 +75,7 @@ async function storeLicenseData(
   data: LicenseData,
 ): Promise<void> {
   await context.secrets.store("license-key", data.key);
-  await context.secrets.store("license-expires", data.expiresAt);
+  await context.secrets.store("license-expires", data.expiresOn);
   await context.secrets.store("license-last-validated", data.lastValidated);
   await context.secrets.store("license-machine-id", data.machineId);
 }
@@ -99,17 +99,17 @@ async function getLicenseData(
   context: vscode.ExtensionContext,
 ): Promise<LicenseData | null> {
   const key = await context.secrets.get("license-key");
-  const expiresAt = await context.secrets.get("license-expires");
+  const expiresOn = await context.secrets.get("license-expires");
   const lastValidated = await context.secrets.get("license-last-validated");
   const machineId = await context.secrets.get("license-machine-id");
 
-  if (!key || !expiresAt || !lastValidated || !machineId) {
+  if (!key || !expiresOn || !lastValidated || !machineId) {
     return null;
   }
 
   return {
     key,
-    expiresAt,
+    expiresOn,
     lastValidated,
     machineId,
   };
@@ -140,51 +140,95 @@ export async function validateLicense(
       let response: Response | undefined;
       const machineId = await generateMachineId();
 
-      // TODO: remove this mock mode
-      const MOCK_MODE = true;
+      const MOCK_MODE = false;
       if (MOCK_MODE) {
         response = new Response(
           JSON.stringify({
             isValid: true,
-            message: "License validated offline using grace period",
-            expiresAt: new Date(
+            message: "MOCK - License validated offline using grace period",
+            expiresOn: new Date(
               Date.now() + 30 * 24 * 60 * 60 * 1000,
             ).toISOString(),
           }),
         );
       } else {
-        // Attempt online validation using license key as API key
+        // Add logging to debug request
+        const requestBody = {
+          machineId,
+          sessionId: vscode.env.sessionId,
+          environment: {
+            ideVersion: vscode.version,
+            ideName: vscode.env.appName,
+            extensionVersion: context.extension.packageJSON.version,
+            platform: os.platform(),
+            release: os.release(),
+          },
+        };
+
+        console.log("License validation request:", {
+          endpoint: API_ENDPOINT,
+          licenseKey: "***", // masked for security
+          body: requestBody,
+        });
+
         response = await fetch(API_ENDPOINT, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${licenseKey}`,
           },
-          body: JSON.stringify({
-            machineId,
-            sessionId: vscode.env.sessionId,
-            // Include additional identifiers that might help prevent abuse
-            environment: {
-              vscodeVersion: vscode.version,
-              extensionVersion: context.extension.packageJSON.version,
-              platform: os.platform(),
-              release: os.release(),
-            },
-          }),
+          body: JSON.stringify(requestBody),
         });
       }
 
-      if (!response.ok) {
-        throw new Error("License validation failed");
+      // Add response validation
+      if (!response) {
+        throw new Error("No response received from license validation");
       }
 
-      const result = await response.json();
+      // Log response status and headers
+      console.log("License validation response:", {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `License validation failed: ${response.status} - ${errorText}`,
+        );
+      }
+
+      // Remove the strict content-type check since the server is sending incorrect headers
+      // Instead, try to parse as JSON and handle parsing errors gracefully
+      let result;
+      try {
+        const responseText = await response.text();
+        console.log("Raw response text:", responseText); // Add this debug log
+
+        if (!responseText) {
+          throw new Error("Empty response received from server");
+        }
+
+        result = JSON.parse(responseText);
+
+        // Log the successful parse
+        console.log("Successfully parsed response:", result);
+      } catch (parseError) {
+        console.error("Parse error:", parseError); // Add this debug log
+        throw new Error(
+          `Failed to parse JSON response: ${
+            parseError instanceof Error ? parseError.message : "Unknown error"
+          }`,
+        );
+      }
 
       if (result.isValid) {
         // Store the license data with machine ID
         await storeLicenseData(context, {
           key: licenseKey,
-          expiresAt: result.expiresAt,
+          expiresOn: result.expiresOn,
           lastValidated: new Date().toISOString(),
           machineId,
         });
@@ -196,7 +240,7 @@ export async function validateLicense(
       return {
         isValid: result.isValid,
         message: result.message,
-        expiresAt: result.expiresAt,
+        expiresOn: result.expiresOn,
       };
     } catch (networkError) {
       // Handle offline scenario
@@ -229,7 +273,7 @@ export async function validateLicense(
       }
 
       // Check if the license is expired
-      const expirationDate = new Date(existingLicense.expiresAt);
+      const expirationDate = new Date(existingLicense.expiresOn);
       if (expirationDate <= new Date()) {
         return {
           isValid: false,
@@ -253,7 +297,7 @@ export async function validateLicense(
       return {
         isValid: true,
         message: "License validated offline using grace period",
-        expiresAt: existingLicense.expiresAt,
+        expiresOn: existingLicense.expiresOn,
         offlineGracePeriodUsed: true,
       };
     }
@@ -286,7 +330,7 @@ export async function isLicenseExpired(
     return true;
   }
 
-  return new Date(data.expiresAt) <= new Date();
+  return new Date(data.expiresOn) <= new Date();
 }
 
 /**
