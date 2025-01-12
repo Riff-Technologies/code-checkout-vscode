@@ -7,7 +7,9 @@
 - dev installs the `code-checkout` package
 - dev runs `npx code-checkout-init`
   - adds a `postcompile` obfuscation script to package.json
-  - adds `activateLicenseCommand`, `revokeLicenseCommand`, `activateOnlineCommand`
+  - adds `activateLicenseCommand`, `revokeLicenseCommand`, `activateOnlineCommand`, and analytics
+    - adds analytics to every command as fire-and-forget
+      - analytics
     - `activateLicenseCommand` allows entry of a license key which will be saved in vscode.secrets
     - `revokeLicenseCommand` will clear out that license key
     - `activateOnlineCommand` will take the user to a website: `https://my-website/{publisher.extensionId}/activate`
@@ -30,8 +32,9 @@
 
 ### Licensing
 
-- the license is added manually by the user, or automatically when the website redirects back to vscode via `activateLicenseCommand`
-- the license key is saved to vscode secret storage along with its expiration and the date it was last validated
+- the license is added manually by the user, or automatically when the website redirects back to vscode/cursor/something else via `activateLicenseCommand`
+- the license key is saved to vscode secret storage along with its expiration and the date it was last validated, and a machineId
+  - the machineID is used locally to see if the license is being used on more than 1 computer, but will also be used on the server
 - there's a 7 day grace period to use the license from the time it was last validated online, if there's no internet connection or the server cannot be reached
 - when a command is run that requires a license, it is validated
   - if it's not present nor valid, then we prompt the user accordingly
