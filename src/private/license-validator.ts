@@ -200,29 +200,11 @@ export async function validateLicense(
         );
       }
 
-      // Remove the strict content-type check since the server is sending incorrect headers
-      // Instead, try to parse as JSON and handle parsing errors gracefully
-      let result;
-      try {
-        const responseText = await response.text();
-        console.log("Raw response text:", responseText); // Add this debug log
+      // Parse JSON response directly since Content-Type is now correct
+      const result = await response.json();
 
-        if (!responseText) {
-          throw new Error("Empty response received from server");
-        }
-
-        result = JSON.parse(responseText);
-
-        // Log the successful parse
-        console.log("Successfully parsed response:", result);
-      } catch (parseError) {
-        console.error("Parse error:", parseError); // Add this debug log
-        throw new Error(
-          `Failed to parse JSON response: ${
-            parseError instanceof Error ? parseError.message : "Unknown error"
-          }`,
-        );
-      }
+      // Log the successful parse
+      console.log("Successfully parsed response:", result);
 
       if (result.isValid) {
         // Store the license data with machine ID
