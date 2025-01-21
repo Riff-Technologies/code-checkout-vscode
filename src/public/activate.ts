@@ -4,7 +4,10 @@ import {
   revokeLicense,
   validateLicense,
   getStoredLicense,
+  generateLicenseKey,
 } from "../private/license-validator";
+
+const API_URL = "https://api.riff-tech.com/v1";
 
 interface CommandAnalytics {
   extensionId: string;
@@ -327,11 +330,19 @@ async function activateLicenseOnline(
   try {
     const { id: extensionId } = context.extension;
     const appScheme = vscode.env.uriScheme;
-    const activationUrl = new URL(
-      `https://mywebsite.com/${extensionId}/activate?app=${appScheme}`,
-    );
+    const licenseKey = generateLicenseKey();
+    const appUri = `${appScheme}://`;
+    const successUrl = `${API_URL}/ide-redirect?target=${appUri}${extensionId}/activate?key=${licenseKey}`;
+    const cancelUrl = `${API_URL}/ide-redirect?target=${appUri}`;
+    const purchaseUrl = `${API_URL}/v1/${extensionId}/checkout?licenseKey=${licenseKey}&successUrl=${successUrl}&cancelUrl=${cancelUrl}`;
 
-    await vscode.env.openExternal(vscode.Uri.parse(activationUrl.toString()));
+    // fetch the purchase url
+    const response = await fetch(purchaseUrl.toString());
+
+    console.log("response", response);
+    const { url } = await response.json();
+
+    await vscode.env.openExternal(vscode.Uri.parse(url));
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";

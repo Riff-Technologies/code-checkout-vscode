@@ -43,6 +43,16 @@ async function generateMachineId(): Promise<string> {
 }
 
 /**
+ * Generates a unique license key
+ * @returns A unique license key
+ */
+export function generateLicenseKey(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 15);
+  return `${timestamp}-${random}`.toUpperCase();
+}
+
+/**
  * Interface for storage implementations to persist license data
  */
 export interface Storage {
