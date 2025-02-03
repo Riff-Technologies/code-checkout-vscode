@@ -3,6 +3,7 @@ import {
   validateLicense,
   getStoredLicense,
   isLicenseExpired,
+  needsOnlineValidation,
 } from "../private/license-validator";
 
 /**
@@ -59,22 +60,51 @@ export function tagFunction<T extends (...args: any[]) => any>(
       // Check if license is expired
       const expired = await isLicenseExpired(context);
       if (expired) {
-        const message =
-          options.type === "free-trial"
-            ? "Your free trial has expired."
-            : "Your license has expired.";
-        await showActivationPrompt(message, extensionName);
-        return undefined as UnwrapPromise<ReturnType<T>>;
-      }
-
-      // Validate the license
-      const validationResult = await validateLicense(context, licenseKey);
-      if (!validationResult.isValid) {
-        await showActivationPrompt(
-          validationResult.message || "Your license is invalid.",
-          extensionName,
+        // For expired licenses, we must validate against the server
+        const validationResult = await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: "Validating license...",
+            cancellable: false,
+          },
+          () => validateLicense(context, licenseKey),
         );
-        return undefined as UnwrapPromise<ReturnType<T>>;
+
+        if (!validationResult.isValid) {
+          const message =
+            options.type === "free-trial"
+              ? "Your free trial has expired."
+              : "Your license has expired.";
+          await showActivationPrompt(message, extensionName);
+          return undefined as UnwrapPromise<ReturnType<T>>;
+        }
+      } else {
+        // License not expired, check if we need online validation
+        const needsOnline = await needsOnlineValidation(context);
+        if (needsOnline) {
+          // Outside grace period - must wait for server validation
+          const validationResult = await vscode.window.withProgress(
+            {
+              location: vscode.ProgressLocation.Notification,
+              title: "Validating license...",
+              cancellable: false,
+            },
+            () => validateLicense(context, licenseKey),
+          );
+
+          if (!validationResult.isValid) {
+            await showActivationPrompt(
+              validationResult.message || "Your license is invalid.",
+              extensionName,
+            );
+            return undefined as UnwrapPromise<ReturnType<T>>;
+          }
+        } else {
+          // Within grace period - validate in background
+          validateLicense(context, licenseKey).catch((error) => {
+            console.error("Background license validation failed:", error);
+          });
+        }
       }
 
       // Execute the original function and handle both sync and async results
