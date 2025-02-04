@@ -132,16 +132,16 @@ async function showActivationPrompt(
   message = "This feature requires a valid license.",
   extensionName: string,
 ): Promise<void> {
-  const activate = "Activate License";
+  const purchase = "Purchase License";
   const response = await vscode.window.showInformationMessage(
     message,
     { modal: false },
-    activate,
+    purchase,
   );
 
-  if (response === activate) {
+  if (response === purchase) {
     await vscode.commands.executeCommand(
-      `${extensionName}.activateOnlineCommand`,
+      `${extensionName}.purchaseLicenseCommand`,
     );
   }
 }

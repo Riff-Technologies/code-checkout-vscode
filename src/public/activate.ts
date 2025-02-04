@@ -222,9 +222,9 @@ export function injectCheckoutCommands(
         context.extensionPath,
         "revokeLicenseCommand",
       );
-      const { commandId: activateOnlineCommandId } = getExtensionInfo(
+      const { commandId: purchaseLicenseCommandId } = getExtensionInfo(
         context.extensionPath,
-        "activateOnlineCommand",
+        "purchaseLicenseCommand",
       );
 
       // Register command for manual activation with analytics
@@ -285,10 +285,10 @@ export function injectCheckoutCommands(
       // Register a command for activating the license online with analytics
       context.subscriptions.push(
         vscode.commands.registerCommand(
-          activateOnlineCommandId,
+          purchaseLicenseCommandId,
           wrapCommandWithAnalytics(
             context,
-            activateOnlineCommandId,
+            purchaseLicenseCommandId,
             async () => {
               await activateLicenseOnline(context);
             },

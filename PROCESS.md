@@ -7,19 +7,19 @@
 - dev installs the `code-checkout` package
 - dev runs `npx code-checkout-init`
   - adds a `postcompile` obfuscation script to package.json
-  - adds `activateLicenseCommand`, `revokeLicenseCommand`, `activateOnlineCommand`, and analytics
+  - adds `activateLicenseCommand`, `revokeLicenseCommand`, `purchaseOnlineCommand`, and analytics
     - adds analytics to every command as fire-and-forget
       - analytics
     - `activateLicenseCommand` allows entry of a license key which will be saved in vscode.secrets
     - `revokeLicenseCommand` will clear out that license key
-    - `activateOnlineCommand` will take the user to a website: `https://my-website/{publisher.extensionId}/activate`
+    - `purchaseOnlineCommand` will take the user to a website: `https://my-website/{publisher.extensionId}/activate`
       - TODO: this website should redirect back to vscode and pass a value into the `activateLicenseCommand`
       - the web will try to open `cursor://riff.testmystuff/test`
 
 ### Tagging
 
 - dev adds the `injectCheckoutCommands` to wrap their `activate` function in `extension.ts`
-  - this adds implementations of `activateLicenseCommand`, `revokeLicenseCommand`, `activateOnlineCommand`
+  - this adds implementations of `activateLicenseCommand`, `revokeLicenseCommand`, `purchaseOnlineCommand`
 - dev "tags" their functions with `tagFunction`
   - this accepts a "free" or "pro" or "free-trial" option
   - `tagFunction` checks the "type" and will validate the license if necessary before executing the tagged function
