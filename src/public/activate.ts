@@ -53,7 +53,7 @@ function wrapCommandWithAnalytics(
   return async (...args: any[]) => {
     const hasValidLicense = (await getStoredLicense(context)) !== undefined;
 
-    await trackCommandAnalytics({
+    trackCommandAnalytics({
       extensionId: context.extension.id,
       commandId,
       timestamp: new Date().toISOString(),
@@ -274,9 +274,6 @@ export function injectCheckoutCommands(
             revokeLicenseCommandId,
             async () => {
               await revokeLicense(context);
-              await vscode.window.showInformationMessage(
-                "License revoked successfully!",
-              );
             },
           ),
         ),

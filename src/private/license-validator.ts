@@ -84,7 +84,14 @@ async function storeLicenseData(
   context: vscode.ExtensionContext,
   data: LicenseData,
 ): Promise<void> {
-  await context.secrets.store("license-key", data.key);
+  const config = vscode.workspace.getConfiguration(
+    context.extension.packageJSON.name,
+  );
+  await config.update(
+    "license-key",
+    data.key,
+    vscode.ConfigurationTarget.Global,
+  );
   await context.secrets.store("license-expires", data.expiresOn);
   await context.secrets.store("license-last-validated", data.lastValidated);
   await context.secrets.store("license-machine-id", data.machineId);
@@ -96,7 +103,10 @@ async function storeLicenseData(
 async function clearLicenseData(
   context: vscode.ExtensionContext,
 ): Promise<void> {
-  await context.secrets.delete("license-key");
+  const config = vscode.workspace.getConfiguration(
+    context.extension.packageJSON.name,
+  );
+  await config.update("license-key", "", vscode.ConfigurationTarget.Global);
   await context.secrets.delete("license-expires");
   await context.secrets.delete("license-last-validated");
   await context.secrets.delete("license-machine-id");
@@ -108,7 +118,10 @@ async function clearLicenseData(
 async function getLicenseData(
   context: vscode.ExtensionContext,
 ): Promise<LicenseData | null> {
-  const key = await context.secrets.get("license-key");
+  const config = vscode.workspace.getConfiguration(
+    context.extension.packageJSON.name,
+  );
+  const key = config.get<string>("license-key", "");
   const expiresOn = await context.secrets.get("license-expires");
   const lastValidated = await context.secrets.get("license-last-validated");
   const machineId = await context.secrets.get("license-machine-id");
@@ -139,6 +152,7 @@ export async function revokeLicense(
   );
   if (result === "Revoke License") {
     await clearLicenseData(context);
+    await vscode.window.showInformationMessage("License revoked successfully!");
   }
 }
 
@@ -316,7 +330,10 @@ export async function validateLicense(
 export async function getStoredLicense(
   context: vscode.ExtensionContext,
 ): Promise<string | undefined> {
-  return context.secrets.get("license-key");
+  const config = vscode.workspace.getConfiguration(
+    context.extension.packageJSON.name,
+  );
+  return config.get<string>("license-key", "");
 }
 
 /**

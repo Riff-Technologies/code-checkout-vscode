@@ -10,11 +10,24 @@ interface VSCodeCommand {
   category?: string;
 }
 
+interface VSCodeConfiguration {
+  title: string;
+  properties: {
+    [key: string]: {
+      type: string;
+      default: string;
+      description: string;
+      scope: string;
+    };
+  };
+}
+
 interface PackageJson {
   name: string;
   displayName?: string;
   contributes?: {
     commands?: VSCodeCommand[];
+    configuration?: VSCodeConfiguration;
   };
   activationEvents?: string[];
   [key: string]: unknown;
@@ -95,6 +108,21 @@ function updatePackageJson(): void {
       packageJson.contributes.commands = [];
     }
 
+    // Initialize configuration if it doesn't exist
+    if (!packageJson.contributes.configuration) {
+      packageJson.contributes.configuration = {
+        title: displayName,
+        properties: {
+          [`${name}.license-key`]: {
+            type: "string",
+            default: "",
+            description: "Enter your license key",
+            scope: "global",
+          },
+        },
+      };
+    }
+
     // Create command using extension's name
     const activateLicenseCommand: VSCodeCommand = {
       command: `${name}.activateLicenseCommand`,
@@ -132,7 +160,7 @@ function updatePackageJson(): void {
         packageJson.activationEvents = [];
       }
 
-      const activationEvents = [`onCommand:${newCommand.command}`, "onUri"];
+      const activationEvents = ["onUri"];
 
       // Add any missing activation events
       for (const event of activationEvents) {
