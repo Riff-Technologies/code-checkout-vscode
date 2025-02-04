@@ -131,7 +131,15 @@ async function getLicenseData(
 export async function revokeLicense(
   context: vscode.ExtensionContext,
 ): Promise<void> {
-  await clearLicenseData(context);
+  // show a confirmation dialog
+  const result = await vscode.window.showInformationMessage(
+    "Are you sure you want to revoke your license?",
+    { modal: true },
+    "Revoke License",
+  );
+  if (result === "Revoke License") {
+    await clearLicenseData(context);
+  }
 }
 
 /**
