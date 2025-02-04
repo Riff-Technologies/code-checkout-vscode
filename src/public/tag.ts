@@ -15,7 +15,7 @@ type UnwrapPromise<T> = T extends Promise<infer U> ? U : T;
  * Options for tagging a function with license validation
  */
 interface TagOptions {
-  type: "free" | "free-trial" | "pro";
+  type: "free" | "paid";
 }
 
 /**
@@ -48,10 +48,7 @@ export function tagFunction<T extends (...args: any[]) => any>(
     // Check stored license
     const licenseKey = await getStoredLicense(context);
     if (!licenseKey) {
-      const message =
-        options.type === "free-trial"
-          ? "Start your free trial to use this feature."
-          : "This feature requires a valid license.";
+      const message = "This feature requires a valid license.";
       await showActivationPrompt(message, extensionName);
       return undefined as UnwrapPromise<ReturnType<T>>;
     }
@@ -71,10 +68,7 @@ export function tagFunction<T extends (...args: any[]) => any>(
         );
 
         if (!validationResult.isValid) {
-          const message =
-            options.type === "free-trial"
-              ? "Your free trial has expired."
-              : "Your license has expired.";
+          const message = "Your license has expired.";
           await showActivationPrompt(message, extensionName);
           return undefined as UnwrapPromise<ReturnType<T>>;
         }
