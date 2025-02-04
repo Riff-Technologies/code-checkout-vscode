@@ -81,6 +81,39 @@ function ensurePostCompileScript(packageJsonPath: string): boolean {
 }
 
 /**
+ * Ensures that .code-checkout is added to .gitignore
+ * @returns boolean indicating if .gitignore was modified
+ */
+function ensureGitIgnoreEntry(): boolean {
+  const gitignorePath = path.join(process.cwd(), ".gitignore");
+  const entry = ".code-checkout";
+
+  // Create .gitignore if it doesn't exist
+  if (!fs.existsSync(gitignorePath)) {
+    fs.writeFileSync(gitignorePath, `${entry}\n`, "utf8");
+    console.log("Created .gitignore with .code-checkout entry");
+    return true;
+  }
+
+  // Read existing content
+  const content = fs.readFileSync(gitignorePath, "utf8");
+  const lines = content.split("\n");
+
+  // Check if entry already exists
+  if (lines.some((line: string) => line.trim() === entry)) {
+    return false;
+  }
+
+  // Add entry to the end of the file
+  const updatedContent = content.endsWith("\n")
+    ? `${content}${entry}\n`
+    : `${content}\n${entry}\n`;
+
+  fs.writeFileSync(gitignorePath, updatedContent, "utf8");
+  return true;
+}
+
+/**
  * Updates the host extension's package.json with new commands
  */
 function updatePackageJson(): void {
@@ -92,6 +125,12 @@ function updatePackageJson(): void {
     const wasModified = ensurePostCompileScript(packageJsonPath);
     if (wasModified) {
       console.log("Added postcompile script to package.json");
+    }
+
+    // Update .gitignore
+    const gitignoreModified = ensureGitIgnoreEntry();
+    if (gitignoreModified) {
+      console.log("Added .code-checkout to .gitignore");
     }
 
     const packageJson: PackageJson = JSON.parse(
