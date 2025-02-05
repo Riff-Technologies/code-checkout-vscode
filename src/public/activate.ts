@@ -325,24 +325,33 @@ async function activateLicenseOnline(
   context: vscode.ExtensionContext,
 ): Promise<void> {
   try {
-    const { id: extensionId } = context.extension;
-    const appScheme = vscode.env.uriScheme;
-    const licenseKey = generateLicenseKey();
-    const appUri = `${appScheme}://`;
-    const successUrl = `${API_URL}/ide-redirect?target=${appUri}${extensionId}/activate?key=${licenseKey}`;
-    const cancelUrl = `${API_URL}/ide-redirect?target=${appUri}`;
-    const purchaseUrl = `${API_URL}/${extensionId}/checkout?licenseKey=${licenseKey}&successUrl=${successUrl}&cancelUrl=${cancelUrl}`;
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "Preparing license activation...",
+        cancellable: false,
+      },
+      async () => {
+        const { id: extensionId } = context.extension;
+        const appScheme = vscode.env.uriScheme;
+        const licenseKey = generateLicenseKey();
+        const appUri = `${appScheme}://`;
+        const successUrl = `${API_URL}/ide-redirect?target=${appUri}${extensionId}/activate?key=${licenseKey}`;
+        const cancelUrl = `${API_URL}/ide-redirect?target=${appUri}`;
+        const purchaseUrl = `${API_URL}/${extensionId}/checkout?licenseKey=${licenseKey}&successUrl=${successUrl}&cancelUrl=${cancelUrl}`;
 
-    console.log("purchaseUrl", purchaseUrl);
+        console.log("purchaseUrl", purchaseUrl);
 
-    // fetch the purchase url
-    const response = await fetch(purchaseUrl.toString());
+        // fetch the purchase url
+        const response = await fetch(purchaseUrl.toString());
 
-    console.log("response", response);
-    const { url } = await response.json();
-    console.log("url", url);
+        console.log("response", response);
+        const { url } = await response.json();
+        console.log("url", url);
 
-    await vscode.env.openExternal(vscode.Uri.parse(url));
+        await vscode.env.openExternal(vscode.Uri.parse(url));
+      },
+    );
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
