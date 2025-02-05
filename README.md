@@ -1,91 +1,119 @@
-# code-checkout SDK docs
+# code-checkout 🔐
 
-## Overview
+> Add professional licensing and paywalls to your VSCode extensions in minutes!
 
-`code-checkout` is a package designed to help VSCode extension developers implement license-based paywalls for their extension's commands. It provides a seamless way to gate specific functionality behind different license tiers (free or paid) while handling all the complexities of license management and validation.
+[![npm version](https://badge.fury.io/js/code-checkout.svg)](https://badge.fury.io/js/code-checkout)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Implementation Flow
+## 🌟 Features
 
-### 1. Installation & Setup
+- 🔒 Secure license validation with offline support
+- 🎯 Simple command tagging for paid vs. free features
+- 🛡️ Code obfuscation to protect your intellectual property
+- 🌐 Seamless integration with VSCode's extension ecosystem
+- ⚡ Zero-config initialization
+- 🔄 Automatic license validation with offline grace period
 
-1. Install the package in your VSCode extension project:
+## 🌐 Platform & Tools
 
-   ```bash
-   npm install code-checkout
-   ```
+code-checkout is more than just an npm package - it's a complete platform for managing your software licensing:
 
-2. Run the initialization script:
+- 💼 [Create a free account](https://code-checkout.com/login) to get started
+- 🖥️ Web Dashboard - Manage licenses, track usage, and view analytics
+- 🛠️ CLI Tools - Powerful command-line interface for automation
+- 📊 Analytics - Track user engagement with your commands
 
-   ```bash
-   npx code-checkout-init
-   ```
+Visit [code-checkout.com](https://code-checkout.com) to learn more about the full platform capabilities.
 
-   This script automatically:
+## 📦 Installation
 
-   - Adds a `postcompile` script to your `package.json` for code obfuscation
-   - Configures required VSCode commands in your extension:
-     - `activateLicenseCommand`: Handles license key entry and storage
-     - `revokeLicenseCommand`: Manages license key removal
-     - `purchaseOnlineCommand`: Directs users to the purchase portal
+```bash
+npm install code-checkout
+```
 
-### 2. Integration
+## 🚀 Quick Start
 
-1. Wrap your extension's `activate` function with the provided `injectCheckoutCommands`:
+### 1. Create Your Account
 
-   ```typescript
-   export const activate = injectCheckoutCommands(
-     (context: vscode.ExtensionContext) => {
-       // Your existing activation code
-     },
-   );
-   ```
+Sign up for a free account at [code-checkout.com](https://code-checkout.com/login).
 
-2. Tag commands that require licensing using the `tagCommand` decorator:
+### 2. Install the Package
 
-   ```typescript
-   const paidFunction = tagCommand(
-     context,
-     { type: "paid" },
-     originalCommandFunction,
-   );
-   ```
+```bash
+npm install code-checkout
+```
 
-### 3. License Management
+### 3. Initialize Your Project
 
-- **Storage**: License keys are stored in VSCode's global workspace configuration, to allow users to view and edit them in Settings
-- **Validation**:
-  - License keys are validated against the server when commands are executed
-  - A 7-day grace period allows offline usage after the last successful validation
-  - Machine IDs are tracked to enforce license usage limits
-  - Failed validations trigger user prompts for license acquisition
+Run our setup wizard to configure your extension:
 
-### 4. Build Process
+```bash
+npx code-checkout-init
+```
 
-The package automatically handles code protection through:
+### 4. Wrap Your Activation
 
-- Post-compilation JavaScript obfuscation
-- Secure license validation logic
-- Protected command execution paths
+```typescript
+export const activate = injectCheckoutCommands(
+  (context: vscode.ExtensionContext) => {
+    // Your existing activation code
+  },
+);
+```
 
-### 5. User Experience
+### 5. Tag Your Premium Commands
 
-When users attempt to access gated functionality:
+```typescript
+const paidFunction = tagCommand(
+  context,
+  { type: "paid" },
+  originalCommandFunction,
+);
+```
 
-1. Server license validation is usually done in the background to avoid disrupting the user's flow
-2. The system checks for a valid license
-3. If no valid license exists:
-   - Users receive a notification
-   - They are directed to the purchase portal
-   - After purchase, the license is automatically activated in their VSCode environment
+Now you're ready to publish your extension! 🎉
 
-## Security Features
+## 🔧 How It Works
 
-- Server-side license validation
-- Machine ID tracking for license enforcement
-- Code obfuscation to protect the extension's code
-- Grace period for offline usage
+### Command Integration
 
-## Security considerations
+The package automatically adds three commands to your extension:
 
-- code-checkout does not provide encryption of your code, only obfuscation (which can be opted out of by removing the `code-checkout-build` postcompile script in your `package.json`)
-- We are considering adding a feature to better secure the host extension's code. If you want this feature, please let us know by creating a feature request Issue!
+- `activateLicenseCommand` - Handles license key entry
+- `revokeLicenseCommand` - Manages license removal
+- `purchaseOnlineCommand` - Directs users to your purchase portal
+
+### License Management
+
+- 🌐 Server-side validation for maximum security
+- 🕒 Offline grace period
+- 💻 Machine ID tracking for license enforcement
+- 🚦 Background validation to avoid disrupting user flow
+
+### Build Process
+
+Post-compilation processing automatically:
+
+- 🔒 Obfuscates your JavaScript code
+- 🛡️ Protects license validation logic
+- 🚧 Secures command execution paths
+
+## 🛡️ Security Considerations
+
+- Code obfuscation is provided but not encryption
+- Obfuscation can be disabled by removing the `code-checkout-build` postcompile script
+- We recommend implementing additional security measures for highly sensitive code
+
+## 📝 License
+
+MIT © Riff Tech, LLC
+
+## 🌟 Support
+
+- 🐛 Found a bug? [Open an issue](https://github.com/Riff-Technologies/code-checkout/issues)
+- 💡 Have a feature request? [Let us know](https://github.com/Riff-Technologies/code-checkout/issues)
+- 📧 Need help? [Contact support](mailto:shawn@riff-tech.com)
+
+---
+
+Made with ❤️ for the VSCode developer community
