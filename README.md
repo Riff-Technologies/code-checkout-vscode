@@ -1,114 +1,91 @@
-# Paywall License Management System
+# code-checkout SDK docs
 
-A TypeScript package that provides robust license management functionality with support for offline validation and license revocation.
+## Overview
 
-## Features
+`code-checkout` is a package designed to help VSCode extension developers implement license-based paywalls for their extension's commands. It provides a seamless way to gate specific functionality behind different license tiers (free or paid) while handling all the complexities of license management and validation.
 
-- Online license validation
-- Offline support with configurable grace periods
-- License revocation support
-- Browser and Node.js storage implementations
-- TypeScript support with strict type checking
+## Implementation Flow
 
-## Installation
+### 1. Installation & Setup
 
-```bash
-npm install your-package-name
-```
+1. Install the package in your VSCode extension project:
 
-## Usage
+   ```bash
+   npm install code-checkout
+   ```
 
-### Basic Setup
+2. Run the initialization script:
 
-```typescript
-import { createLicenseManager, LicenseManagerConfig } from "your-package-name";
+   ```bash
+   npx code-checkout-init
+   ```
 
-// Browser setup
-const browserConfig: LicenseManagerConfig = {
-  apiEndpoint: "https://your-api.com/validate-license",
-  storageType: "browser",
-  storageKeyPrefix: "myapp_", // optional
-};
+   This script automatically:
 
-const browserLicenseManager = createLicenseManager(browserConfig);
+   - Adds a `postcompile` script to your `package.json` for code obfuscation
+   - Configures required VSCode commands in your extension:
+     - `activateLicenseCommand`: Handles license key entry and storage
+     - `revokeLicenseCommand`: Manages license key removal
+     - `purchaseOnlineCommand`: Directs users to the purchase portal
 
-// Node.js setup
-const nodeConfig: LicenseManagerConfig = {
-  apiEndpoint: "https://your-api.com/validate-license",
-  storageType: "node",
-  storagePath: "/path/to/storage",
-};
+### 2. Integration
 
-const nodeLicenseManager = createLicenseManager(nodeConfig);
-```
+1. Wrap your extension's `activate` function with the provided `injectCheckoutCommands`:
 
-### License Validation
+   ```typescript
+   export const activate = injectCheckoutCommands(
+     (context: vscode.ExtensionContext) => {
+       // Your existing activation code
+     },
+   );
+   ```
 
-```typescript
-import { LicenseValidationOptions } from "your-package-name";
+2. Tag commands that require licensing using the `tagCommand` decorator:
 
-// Basic validation
-try {
-  const result = await licenseManager.validateLicense("YOUR-LICENSE-KEY");
-  if (result.isValid) {
-    console.log("License is valid!");
-  } else {
-    console.log(`License invalid: ${result.message}`);
-  }
-} catch (error) {
-  console.error("Validation failed:", error);
-}
+   ```typescript
+   const paidFunction = tagCommand(
+     context,
+     { type: "paid" },
+     originalCommandFunction,
+   );
+   ```
 
-// Validation with offline support
-const options: LicenseValidationOptions = {
-  allowOffline: true,
-  gracePeriodMs: 7 * 24 * 60 * 60 * 1000, // 7 days
-};
+### 3. License Management
 
-try {
-  const result = await licenseManager.validateLicense(
-    "YOUR-LICENSE-KEY",
-    options,
-  );
-  if (result.wasOffline) {
-    console.log("Using offline validation");
-  }
-  // Handle result...
-} catch (error) {
-  console.error("Validation failed:", error);
-}
-```
+- **Storage**: License keys are stored in VSCode's global workspace configuration, to allow users to view and edit them in Settings
+- **Validation**:
+  - License keys are validated against the server when commands are executed
+  - A 7-day grace period allows offline usage after the last successful validation
+  - Machine IDs are tracked to enforce license usage limits
+  - Failed validations trigger user prompts for license acquisition
 
-### License States
+### 4. Build Process
 
-The system supports the following license states:
+The package automatically handles code protection through:
 
-- `active`: License is valid and active
-- `expired`: License has expired
-- `revoked`: License has been revoked by the server
-- `grace`: License is being used in offline mode within the grace period
+- Post-compilation JavaScript obfuscation
+- Secure license validation logic
+- Protected command execution paths
 
-### API Response Format
+### 5. User Experience
 
-Your license validation API endpoint should return responses in the following format:
+When users attempt to access gated functionality:
 
-```typescript
-interface LicenseValidationResponse {
-  isValid: boolean;
-  message?: string;
-  expiresOn: string;
-  isRevoked: boolean;
-  gracePeriodMs: number;
-}
-```
+1. Server license validation is usually done in the background to avoid disrupting the user's flow
+2. The system checks for a valid license
+3. If no valid license exists:
+   - Users receive a notification
+   - They are directed to the purchase portal
+   - After purchase, the license is automatically activated in their VSCode environment
 
-## Security Considerations
+## Security Features
 
-1. Always validate licenses server-side for critical operations
-2. Use HTTPS for all API communications
-3. Implement rate limiting on your validation endpoint
-4. Consider implementing additional security measures like license key signing
+- Server-side license validation
+- Machine ID tracking for license enforcement
+- Code obfuscation to protect the extension's code
+- Grace period for offline usage
 
-## Contributing
+## Security considerations
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+- code-checkout does not provide encryption of your code, only obfuscation (which can be opted out of by removing the `code-checkout-build` postcompile script in your `package.json`)
+- We are considering adding a feature to better secure the host extension's code. If you want this feature, please let us know by creating a feature request Issue!
