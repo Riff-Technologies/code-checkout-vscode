@@ -265,7 +265,6 @@ export async function validateLicense(
     } catch (networkError) {
       // Handle offline scenario
       const existingLicense = await getLicenseData(context);
-      const currentMachineId = await generateMachineId();
 
       // If there's no existing license data, we can't provide offline access
       if (!existingLicense) {
@@ -281,14 +280,6 @@ export async function validateLicense(
         return {
           isValid: false,
           message: "License key mismatch during offline validation",
-        };
-      }
-
-      // Verify machine ID matches to prevent license sharing
-      if (existingLicense.machineId !== currentMachineId) {
-        return {
-          isValid: false,
-          message: "License is not valid for this machine",
         };
       }
 
