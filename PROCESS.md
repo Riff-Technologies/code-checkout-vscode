@@ -20,9 +20,9 @@
 
 - dev adds the `injectCheckoutCommands` to wrap their `activate` function in `extension.ts`
   - this adds implementations of `activateLicenseCommand`, `revokeLicenseCommand`, `purchaseOnlineCommand`
-- dev "tags" their functions with `tagFunction`
+- dev "tags" their functions with `tagCommand`
   - this accepts a "free" or "pro" or "free-trial" option
-  - `tagFunction` checks the "type" and will validate the license if necessary before executing the tagged function
+  - `tagCommand` checks the "type" and will validate the license if necessary before executing the tagged function
   - if the license is not found/not valid, a notification is shown which will direct the user to the website in the default browser
 
 ### Building

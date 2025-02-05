@@ -1,7 +1,7 @@
 import {
-  tagFunction,
+  tagCommand,
   withActivateCommand,
   injectCheckoutCommands,
 } from "./public";
 
-export { tagFunction, withActivateCommand, injectCheckoutCommands };
+export { tagCommand, withActivateCommand, injectCheckoutCommands };

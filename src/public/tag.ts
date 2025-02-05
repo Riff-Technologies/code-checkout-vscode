@@ -24,7 +24,7 @@ interface TagOptions {
  * @param fn - Function to wrap with license validation
  * @returns Tagged function that performs license validation before execution
  */
-export function tagFunction<T extends (...args: any[]) => any>(
+export function tagCommand<T extends (...args: any[]) => any>(
   context: vscode.ExtensionContext,
   options: TagOptions,
   fn: T,

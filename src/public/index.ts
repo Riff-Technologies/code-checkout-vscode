@@ -1,4 +1,4 @@
-import { tagFunction } from "./tag";
+import { tagCommand } from "./tag";
 import { withActivateCommand, injectCheckoutCommands } from "./activate";
 
-export { tagFunction, withActivateCommand, injectCheckoutCommands };
+export { tagCommand, withActivateCommand, injectCheckoutCommands };
