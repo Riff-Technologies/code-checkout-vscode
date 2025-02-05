@@ -225,6 +225,12 @@ export async function validateLicense(
         headers: response.headers,
       });
 
+      if (response.status === 403) {
+        // Clear any existing license if validation failed
+        await clearLicenseData(context);
+        throw new Error("Invalid license key");
+      }
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(

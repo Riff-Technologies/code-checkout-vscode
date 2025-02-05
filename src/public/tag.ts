@@ -95,6 +95,7 @@ export function tagCommand<T extends (...args: any[]) => any>(
           }
         } else {
           // Within grace period - validate in background
+          console.log("Validating license in background");
           validateLicense(context, licenseKey).catch((error) => {
             console.error("Background license validation failed:", error);
           });
