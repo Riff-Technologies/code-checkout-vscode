@@ -331,13 +331,16 @@ async function activateLicenseOnline(
     const appUri = `${appScheme}://`;
     const successUrl = `${API_URL}/ide-redirect?target=${appUri}${extensionId}/activate?key=${licenseKey}`;
     const cancelUrl = `${API_URL}/ide-redirect?target=${appUri}`;
-    const purchaseUrl = `${API_URL}/v1/${extensionId}/checkout?licenseKey=${licenseKey}&successUrl=${successUrl}&cancelUrl=${cancelUrl}`;
+    const purchaseUrl = `${API_URL}/${extensionId}/checkout?licenseKey=${licenseKey}&successUrl=${successUrl}&cancelUrl=${cancelUrl}`;
+
+    console.log("purchaseUrl", purchaseUrl);
 
     // fetch the purchase url
     const response = await fetch(purchaseUrl.toString());
 
     console.log("response", response);
     const { url } = await response.json();
+    console.log("url", url);
 
     await vscode.env.openExternal(vscode.Uri.parse(url));
   } catch (error) {
