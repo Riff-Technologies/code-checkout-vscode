@@ -18,12 +18,12 @@
 
 code-checkout is more than just an npm package - it's a complete platform for managing your software licensing:
 
-- 💼 [Create a free account](https://code-checkout.com/login) to get started
+- 💼 [Create a free account](https://codecheckout.dev/login) to get started
 - 🖥️ Web Dashboard - Manage licenses, track usage, and view analytics
 - 🛠️ CLI Tools - Powerful command-line interface for automation
 - 📊 Analytics - Track user engagement with your commands
 
-Visit [code-checkout.com](https://code-checkout.com) to learn more about the full platform capabilities.
+Visit [codecheckout.dev](https://codecheckout.dev) to learn more about the full platform capabilities.
 
 ## 📦 Installation
 
@@ -35,7 +35,7 @@ npm install code-checkout
 
 ### 1. Create Your Account
 
-Sign up for a free account at [code-checkout.com](https://code-checkout.com/login).
+Sign up for a free account at [codecheckout.dev](https://codecheckout.dev/login).
 
 ### 2. Install the Package
 

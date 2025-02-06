@@ -24,7 +24,7 @@ async function trackCommandAnalytics(
   analytics: CommandAnalytics,
 ): Promise<void> {
   try {
-    const ANALYTICS_ENDPOINT = "https://api.riff-tech.com/v1/analytics/events";
+    const ANALYTICS_ENDPOINT = `${API_URL}/analytics/events`;
 
     await fetch(ANALYTICS_ENDPOINT, {
       method: "POST",
