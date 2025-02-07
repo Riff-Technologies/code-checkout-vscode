@@ -1,6 +1,6 @@
 {
   "name": "@riff-tech/code-checkout",
-  "version": "0.1.190",
+  "version": "1.0.0",
   "publisher": "riff-tech",
   "description": "Code Checkout support for paid VSCode Extensions",
   "main": "dist/index.js",
@@ -20,7 +20,8 @@
     "dev-setup": "./dev-setup.sh ../testmystuff",
     "lint": "eslint 'src/**/*.{ts,tsx}' --quiet",
     "lint:fix": "eslint 'src/**/*.{ts,tsx}' --quiet --fix",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\""
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "publish": "npm run build && npm publish --access public"
   },
   "files": [
     "dist",
