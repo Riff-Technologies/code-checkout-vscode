@@ -16,6 +16,10 @@ type UnwrapPromise<T> = T extends Promise<infer U> ? U : T;
  */
 interface TagOptions {
   type: "free" | "paid";
+  activationMessage?: string;
+  activationCtaTitle?: string;
+  reactivationMessage?: string;
+  reactivationCtaTitle?: string;
 }
 
 /**
@@ -48,8 +52,10 @@ export function tagCommand<T extends (...args: any[]) => any>(
     // Check stored license
     const licenseKey = await getStoredLicense(context);
     if (!licenseKey) {
-      const message = "This feature requires a valid license.";
-      await showActivationPrompt(message, extensionName);
+      const message =
+        options.activationMessage || "This feature requires a valid license.";
+      const ctaTitle = options.activationCtaTitle || "Purchase License";
+      await showActivationPrompt(extensionName, message, ctaTitle);
       return undefined as UnwrapPromise<ReturnType<T>>;
     }
 
@@ -68,8 +74,10 @@ export function tagCommand<T extends (...args: any[]) => any>(
         );
 
         if (!validationResult.isValid) {
-          const message = "Your license has expired.";
-          await showActivationPrompt(message, extensionName);
+          const message =
+            options.reactivationMessage || "Your license has expired.";
+          const ctaTitle = options.reactivationCtaTitle || "Purchase License";
+          await showActivationPrompt(extensionName, message, ctaTitle);
           return undefined as UnwrapPromise<ReturnType<T>>;
         }
       } else {
@@ -124,17 +132,17 @@ export function tagCommand<T extends (...args: any[]) => any>(
  * @param message - Optional custom message to display
  */
 async function showActivationPrompt(
-  message = "This feature requires a valid license.",
   extensionName: string,
+  message = "This feature requires a valid license.",
+  ctaTitle = "Purchase License",
 ): Promise<void> {
-  const purchase = "Purchase License";
   const response = await vscode.window.showInformationMessage(
     message,
     { modal: false },
-    purchase,
+    ctaTitle,
   );
 
-  if (response === purchase) {
+  if (response === ctaTitle) {
     await vscode.commands.executeCommand(
       `${extensionName}.purchaseLicenseCommand`,
     );
