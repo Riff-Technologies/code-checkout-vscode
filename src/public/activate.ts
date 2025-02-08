@@ -8,7 +8,7 @@ import {
 } from "../private/license-validator";
 
 const API_URL = "https://api.riff-tech.com/v1";
-
+const WEB_URL = "https://codecheckout.dev";
 interface CommandAnalytics {
   extensionId: string;
   commandId: string;
@@ -336,7 +336,7 @@ async function activateLicenseOnline(
         const appScheme = vscode.env.uriScheme;
         const licenseKey = generateLicenseKey();
         const appUri = `${appScheme}://`;
-        const successUrl = `${API_URL}/ide-redirect?target=${appUri}${extensionId}/activate?key=${licenseKey}`;
+        const successUrl = `${WEB_URL}/activate?key=${licenseKey}&redirectUri=${appUri}${extensionId}`;
         const cancelUrl = `${API_URL}/ide-redirect?target=${appUri}`;
         const purchaseUrl = `${API_URL}/${extensionId}/checkout?licenseKey=${licenseKey}&successUrl=${successUrl}&cancelUrl=${cancelUrl}`;
 
