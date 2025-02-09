@@ -188,6 +188,7 @@ export async function validateLicense(
         const requestBody = {
           machineId,
           sessionId: vscode.env.sessionId,
+          extensionId: context.extension.id,
           environment: {
             ideVersion: vscode.version,
             ideName: vscode.env.appName,
