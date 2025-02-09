@@ -8,12 +8,14 @@ import {
 } from "../private/license-validator";
 
 const API_URL = "https://api.riff-tech.com/v1";
+const DEV_API_URL = "https://dev-api.riff-tech.com/v1";
 const WEB_URL = "https://codecheckout.dev";
 interface CommandAnalytics {
   extensionId: string;
   commandId: string;
   timestamp: string;
   hasValidLicense: boolean;
+  testMode: boolean;
 }
 
 /**
@@ -24,7 +26,8 @@ async function trackCommandAnalytics(
   analytics: CommandAnalytics,
 ): Promise<void> {
   try {
-    const ANALYTICS_ENDPOINT = `${API_URL}/analytics/events`;
+    const url = analytics.testMode ? DEV_API_URL : API_URL;
+    const ANALYTICS_ENDPOINT = `${url}/analytics/events`;
 
     await fetch(ANALYTICS_ENDPOINT, {
       method: "POST",
@@ -43,11 +46,13 @@ async function trackCommandAnalytics(
  * Wraps a command to include analytics tracking
  * @param context - The extension context
  * @param commandId - The ID of the command being wrapped
+ * @param testMode - Whether the command is running in test mode
  * @param callback - The original command callback
  */
 function wrapCommandWithAnalytics(
   context: vscode.ExtensionContext,
   commandId: string,
+  testMode: boolean = false,
   callback: (...args: any[]) => any,
 ): (...args: any[]) => Promise<any> {
   return async (...args: any[]) => {
@@ -58,6 +63,7 @@ function wrapCommandWithAnalytics(
       commandId,
       timestamp: new Date().toISOString(),
       hasValidLicense,
+      testMode,
     });
 
     return callback(...args);
@@ -148,12 +154,18 @@ async function handleUri(
   }
 }
 
+export type CheckoutOptions = {
+  testMode?: boolean;
+  [key: string]: any;
+};
+
 /**
  * Injects the activate command into the extension
  * @param originalActivate - The original activate function
  */
 export function injectCheckoutCommands(
   originalActivate: (context: vscode.ExtensionContext) => void,
+  options?: CheckoutOptions,
 ) {
   return async (context: vscode.ExtensionContext) => {
     try {
@@ -170,6 +182,7 @@ export function injectCheckoutCommands(
         const wrappedCallback = wrapCommandWithAnalytics(
           context,
           commandId,
+          options?.testMode,
           callback,
         );
         return originalRegisterCommand.call(
@@ -234,6 +247,7 @@ export function injectCheckoutCommands(
           wrapCommandWithAnalytics(
             context,
             activateLicenseCommandId,
+            options?.testMode,
             async () => {
               const licenseKey = await vscode.window.showInputBox({
                 prompt: "Enter your license key",
@@ -272,6 +286,7 @@ export function injectCheckoutCommands(
           wrapCommandWithAnalytics(
             context,
             revokeLicenseCommandId,
+            options?.testMode,
             async () => {
               await revokeLicense(context);
             },
@@ -286,8 +301,9 @@ export function injectCheckoutCommands(
           wrapCommandWithAnalytics(
             context,
             purchaseLicenseCommandId,
+            options?.testMode,
             async () => {
-              await activateLicenseOnline(context);
+              await activateLicenseOnline(context, options?.testMode);
             },
           ),
         ),
@@ -319,10 +335,12 @@ export function withActivateCommand() {
 /**
  * Opens the license activation website in the default web browser
  * @param context - The VS Code extension context
+ * @param testMode - Whether the command is running in test mode
  * @throws Error if unable to determine the extension ID or open the URL
  */
 async function activateLicenseOnline(
   context: vscode.ExtensionContext,
+  testMode?: boolean,
 ): Promise<void> {
   try {
     await vscode.window.withProgress(
@@ -332,13 +350,15 @@ async function activateLicenseOnline(
         cancellable: false,
       },
       async () => {
+        const apiUrl = testMode ? DEV_API_URL : API_URL;
         const { id: extensionId } = context.extension;
         const appScheme = vscode.env.uriScheme;
         const licenseKey = generateLicenseKey();
         const appUri = `${appScheme}://`;
         const successUrl = `${WEB_URL}/activate?key=${licenseKey}&redirectUri=${appUri}${extensionId}`;
-        const cancelUrl = `${API_URL}/ide-redirect?target=${appUri}`;
-        const purchaseUrl = `${API_URL}/${extensionId}/checkout?licenseKey=${licenseKey}&successUrl=${successUrl}&cancelUrl=${cancelUrl}`;
+        const cancelUrl = `${apiUrl}/ide-redirect?target=${appUri}`;
+        const testParam = testMode ? "&testMode=true" : "";
+        const purchaseUrl = `${apiUrl}/${extensionId}/checkout?licenseKey=${licenseKey}&successUrl=${successUrl}&cancelUrl=${cancelUrl}${testParam}`;
 
         console.log("purchaseUrl", purchaseUrl);
 
