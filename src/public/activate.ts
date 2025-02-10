@@ -121,6 +121,7 @@ async function handleLicenseValidationResult(result: {
 async function handleUri(
   uri: vscode.Uri,
   context: vscode.ExtensionContext,
+  testMode?: boolean,
 ): Promise<void> {
   try {
     const params = new URLSearchParams(uri.query);
@@ -131,7 +132,7 @@ async function handleUri(
         throw new Error("No license key provided");
       }
 
-      const result = await validateLicense(context, licenseKey);
+      const result = await validateLicense(context, licenseKey, testMode);
       await handleLicenseValidationResult(result);
     };
 
@@ -200,7 +201,7 @@ export function injectCheckoutCommands(
         const originalHandleUri = handler.handleUri;
         handler.handleUri = async (uri: vscode.Uri) => {
           if (uri.path === "/activate") {
-            await handleUri(uri, context);
+            await handleUri(uri, context, options?.testMode);
           } else {
             await originalHandleUri.call(handler, uri);
           }
@@ -265,7 +266,11 @@ export function injectCheckoutCommands(
               }
 
               try {
-                const result = await validateLicense(context, licenseKey);
+                const result = await validateLicense(
+                  context,
+                  licenseKey,
+                  options?.testMode,
+                );
                 await handleLicenseValidationResult(result);
               } catch (error) {
                 await vscode.window.showErrorMessage(
@@ -351,19 +356,33 @@ async function activateLicenseOnline(
       },
       async () => {
         const apiUrl = testMode ? DEV_API_URL : API_URL;
-        const { id: extensionId } = context.extension;
+        const { id: extensionId, packageJSON } = context.extension;
+        const name = packageJSON.displayName;
         const appScheme = vscode.env.uriScheme;
         const licenseKey = generateLicenseKey();
         const appUri = `${appScheme}://`;
-        const successUrl = `${WEB_URL}/activate?key=${licenseKey}&redirectUri=${appUri}${extensionId}`;
-        const cancelUrl = `${apiUrl}/ide-redirect?target=${appUri}`;
+
+        // Create and encode the redirect URI first
+        const redirectUri = encodeURIComponent(
+          `${appUri}${extensionId}/activate?key=${licenseKey}`,
+        );
+        // Create and encode the full success URL
+        const successUrl = encodeURIComponent(
+          `${WEB_URL}/activate?key=${licenseKey}&name=${name}&redirectUri=${redirectUri}`,
+        );
+        const cancelUrl = encodeURIComponent(
+          `${apiUrl}/ide-redirect?target=${appUri}`,
+        );
         const testParam = testMode ? "&testMode=true" : "";
         const purchaseUrl = `${apiUrl}/${extensionId}/checkout?licenseKey=${licenseKey}&successUrl=${successUrl}&cancelUrl=${cancelUrl}${testParam}`;
 
         console.log("purchaseUrl", purchaseUrl);
+        const purchaseUrlObject = new URL(purchaseUrl);
+
+        console.log("purchaseUrlObject", purchaseUrlObject);
 
         // fetch the purchase url
-        const response = await fetch(purchaseUrl.toString());
+        const response = await fetch(purchaseUrlObject.toString());
 
         console.log("response", response);
         const { url } = await response.json();

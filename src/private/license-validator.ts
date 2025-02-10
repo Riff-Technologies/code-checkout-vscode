@@ -165,6 +165,7 @@ export async function revokeLicense(
 export async function validateLicense(
   context: vscode.ExtensionContext,
   licenseKey: string,
+  testMode = false,
   gracePeriodDays = 7,
 ): Promise<ValidationResult> {
   try {
@@ -173,7 +174,7 @@ export async function validateLicense(
       const machineId = await generateMachineId();
 
       const MOCK_MODE = false;
-      if (MOCK_MODE) {
+      if (MOCK_MODE || testMode) {
         response = new Response(
           JSON.stringify({
             isValid: true,
