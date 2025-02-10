@@ -222,7 +222,7 @@ export function injectCheckoutCommands(
         context.subscriptions.push(
           vscode.window.registerUriHandler({
             handleUri: async (uri: vscode.Uri) => {
-              await handleUri(uri, context);
+              await handleUri(uri, context, options?.testMode);
             },
           }),
         );
