@@ -3,6 +3,7 @@ import * as os from "os";
 import * as crypto from "crypto";
 
 const API_ENDPOINT = "https://api.riff-tech.com/v1/validate";
+const DEV_API_ENDPOINT = "https://dev-api.riff-tech.com/v1/validate";
 
 interface ValidationResult {
   isValid: boolean;
@@ -174,7 +175,7 @@ export async function validateLicense(
       const machineId = await generateMachineId();
 
       const MOCK_MODE = false;
-      if (MOCK_MODE || testMode) {
+      if (MOCK_MODE) {
         response = new Response(
           JSON.stringify({
             isValid: true,
@@ -199,13 +200,14 @@ export async function validateLicense(
           },
         };
 
+        const endpoint = testMode ? DEV_API_ENDPOINT : API_ENDPOINT;
         console.log("License validation request:", {
-          endpoint: API_ENDPOINT,
+          endpoint,
           licenseKey: "***", // masked for security
           body: requestBody,
         });
 
-        response = await fetch(API_ENDPOINT, {
+        response = await fetch(endpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
