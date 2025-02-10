@@ -167,7 +167,7 @@ export async function validateLicense(
   context: vscode.ExtensionContext,
   licenseKey: string,
   testMode = false,
-  gracePeriodDays = 7,
+  gracePeriodDays = 3,
 ): Promise<ValidationResult> {
   try {
     try {
@@ -357,7 +357,7 @@ export async function isLicenseExpired(
  */
 export async function needsOnlineValidation(
   context: vscode.ExtensionContext,
-  gracePeriodDays = 7,
+  gracePeriodDays = 3,
 ): Promise<boolean> {
   const data = await getLicenseData(context);
   if (!data) {

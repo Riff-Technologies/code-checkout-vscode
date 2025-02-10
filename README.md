@@ -86,7 +86,7 @@ The package automatically adds three commands to your extension:
 ### License Management
 
 - 🌐 Server-side validation for maximum security
-- 🕒 Offline grace period
+- 🕒 Offline grace period (3 days - _feature to add customization coming soon_)
 - 💻 Machine ID tracking for license enforcement
 - 🚦 Background validation to avoid disrupting user flow
 
