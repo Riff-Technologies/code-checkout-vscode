@@ -14,7 +14,7 @@ type UnwrapPromise<T> = T extends Promise<infer U> ? U : T;
 /**
  * Options for tagging a function with license validation
  */
-interface TagOptions {
+export interface TagOptions {
   type: "free" | "paid";
   activationMessage?: string;
   activationCtaTitle?: string;
