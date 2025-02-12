@@ -31,15 +31,38 @@ export async function getLicense(
   context: vscode.ExtensionContext,
   validateOnline = false,
 ): Promise<LicenseData | null> {
+  console.log(
+    "[getLicense] Starting license check with validateOnline:",
+    validateOnline,
+  );
+
   const licenseKey = await getStoredLicense(context);
+  console.log(
+    "[getLicense] Retrieved stored license:",
+    licenseKey ? "Found" : "Not found",
+  );
+
   if (!licenseKey) {
+    console.log("[getLicense] No license key found, returning null");
     return null;
   }
 
   try {
     // If online validation is requested or needed, perform it
-    if (validateOnline || (await needsOnlineValidation(context))) {
-      const validationResult = await validateLicense(context, licenseKey);
+    const needsOnline = await needsOnlineValidation(context);
+    console.log("[getLicense] Needs online validation:", needsOnline);
+
+    if (validateOnline || needsOnline) {
+      console.log("[getLicense] Performing online validation");
+      const validationResult = await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Validating license...",
+          cancellable: false,
+        },
+        () => validateLicense(context, licenseKey),
+      );
+      console.log("[getLicense] Online validation result:", validationResult);
       return {
         licenseKey,
         ...validationResult,
@@ -50,9 +73,22 @@ export async function getLicense(
 
     // Check if license is expired
     const isExpired = await isLicenseExpired(context);
+    console.log("[getLicense] License expired check:", isExpired);
+
     if (isExpired) {
-      // For expired licenses, always validate online
-      const validationResult = await validateLicense(context, licenseKey);
+      console.log("[getLicense] License expired, performing online validation");
+      const validationResult = await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Validating license...",
+          cancellable: false,
+        },
+        () => validateLicense(context, licenseKey),
+      );
+      console.log(
+        "[getLicense] Expired license validation result:",
+        validationResult,
+      );
       return {
         licenseKey,
         ...validationResult,
@@ -62,22 +98,35 @@ export async function getLicense(
     }
 
     // Return offline validation result
-    return {
+    const needsValidation = await needsOnlineValidation(context);
+    console.log(
+      "[getLicense] Final needs online validation check:",
+      needsValidation,
+    );
+
+    // validate the license in the background
+    validateLicense(context, licenseKey);
+
+    const result = {
       licenseKey,
       isValid: true,
       isExpired: false,
-      isOnlineValidationRequired: await needsOnlineValidation(context),
+      isOnlineValidationRequired: needsValidation,
       lastValidated: new Date().toISOString(),
     };
+    console.log("[getLicense] Returning offline validation result:", result);
+    return result;
   } catch (error) {
-    console.error("License validation failed:", error);
-    return {
+    console.error("[getLicense] License validation failed:", error);
+    const errorResult = {
       licenseKey,
       isValid: false,
       isExpired: true,
       isOnlineValidationRequired: true,
       lastValidated: new Date().toISOString(),
     };
+    console.log("[getLicense] Returning error result:", errorResult);
+    return errorResult;
   }
 }
 
@@ -106,6 +155,7 @@ export function tagCommand<T extends (...args: any[]) => any>(
 ): T {
   // Free functions pass through without validation
   if (options.type === "free") {
+    console.log("[tagCommand] Free function, skipping validation");
     return fn;
   }
 
@@ -113,19 +163,32 @@ export function tagCommand<T extends (...args: any[]) => any>(
   const { id: extensionId } = context.extension;
   const extensionNameComponents = extensionId.split(".");
   if (extensionNameComponents.length < 2) {
+    console.error("[tagCommand] Invalid extension ID:", extensionId);
     throw new Error("Invalid extension ID");
   }
   const extensionName = extensionNameComponents[1];
+  console.log("[tagCommand] Extension name:", extensionName);
 
   return (async (
     ...args: Parameters<T>
   ): Promise<UnwrapPromise<ReturnType<T>>> => {
     try {
+      console.log("[tagCommand] Starting license validation");
       // Get and validate license
+
       const licenseData = await getLicense(context, false);
+
+      console.log("[tagCommand] License data:", {
+        hasLicense: !!licenseData,
+        hasLicenseKey: !!licenseData?.licenseKey,
+        isValid: licenseData?.isValid,
+        isExpired: licenseData?.isExpired,
+        isOnlineValidationRequired: licenseData?.isOnlineValidationRequired,
+      });
 
       // Handle no license case
       if (!licenseData || !licenseData.licenseKey) {
+        console.log("[tagCommand] No license found");
         const message =
           options.activationMessage || "This feature requires a valid license.";
         const ctaTitle = options.activationCtaTitle || "Purchase License";
@@ -135,6 +198,7 @@ export function tagCommand<T extends (...args: any[]) => any>(
 
       // Handle expired or invalid license
       if (!licenseData.isValid || licenseData.isExpired) {
+        console.log("[tagCommand] License invalid or expired");
         const message =
           options.reactivationMessage || "Your license has expired.";
         const ctaTitle = options.reactivationCtaTitle || "Purchase License";
@@ -144,6 +208,7 @@ export function tagCommand<T extends (...args: any[]) => any>(
 
       // Handle online validation requirement
       if (licenseData.isOnlineValidationRequired) {
+        console.log("[tagCommand] Online validation required");
         const validationResult = await vscode.window.withProgress(
           {
             location: vscode.ProgressLocation.Notification,
@@ -152,8 +217,10 @@ export function tagCommand<T extends (...args: any[]) => any>(
           },
           () => validateLicense(context, licenseData.licenseKey!),
         );
+        console.log("[tagCommand] Online validation result:", validationResult);
 
         if (!validationResult.isValid) {
+          console.log("[tagCommand] Online validation failed");
           await showActivationPrompt(
             extensionName,
             validationResult.message || "Your license is invalid.",
@@ -163,13 +230,16 @@ export function tagCommand<T extends (...args: any[]) => any>(
         }
       }
 
+      console.log(
+        "[tagCommand] License validation successful, executing function",
+      );
       // Execute the original function and handle both sync and async results
       const result = fn(...args);
       return result instanceof Promise
         ? ((await result) as UnwrapPromise<ReturnType<T>>)
         : (result as UnwrapPromise<ReturnType<T>>);
     } catch (error) {
-      console.error("License validation failed:", error);
+      console.error("[tagCommand] License validation failed:", error);
       await vscode.window.showErrorMessage(
         `Unable to validate license: ${error instanceof Error ? error.message : "Unknown error"}`,
       );

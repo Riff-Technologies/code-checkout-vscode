@@ -1,6 +1,6 @@
 {
   "name": "@riff-tech/code-checkout",
-  "version": "1.2.0",
+  "version": "1.2.8",
   "publisher": "riff-tech",
   "description": "Code Checkout support for paid VSCode Extensions",
   "main": "dist/index.js",

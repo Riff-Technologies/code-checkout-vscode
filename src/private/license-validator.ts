@@ -104,13 +104,21 @@ async function storeLicenseData(
 async function clearLicenseData(
   context: vscode.ExtensionContext,
 ): Promise<void> {
-  const config = vscode.workspace.getConfiguration(
-    context.extension.packageJSON.name,
+  // Set last validated to 10 years ago to force validation
+  const tenYearsAgo = new Date();
+  tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
+  await context.secrets.store(
+    "license-last-validated",
+    tenYearsAgo.toISOString(),
   );
-  await config.update("license-key", "", vscode.ConfigurationTarget.Global);
-  await context.secrets.delete("license-expires");
-  await context.secrets.delete("license-last-validated");
-  await context.secrets.delete("license-machine-id");
+
+  // Don't clear out the license key
+  // const config = vscode.workspace.getConfiguration(
+  //   context.extension.packageJSON.name,
+  // );
+  // await config.update("license-key", "", vscode.ConfigurationTarget.Global);
+  // await context.secrets.delete("license-expires");
+  // await context.secrets.delete("license-machine-id");
 }
 
 /**
@@ -229,7 +237,7 @@ export async function validateLicense(
         headers: response.headers,
       });
 
-      if (response.status === 403) {
+      if (response.status === 403 || response.status === 401) {
         // Clear any existing license if validation failed
         await clearLicenseData(context);
         throw new Error("Invalid license key");
