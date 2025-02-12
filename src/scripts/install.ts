@@ -147,20 +147,25 @@ function updatePackageJson(): void {
       packageJson.contributes.commands = [];
     }
 
-    // Initialize configuration if it doesn't exist
+    // Initialize or update configuration
     if (!packageJson.contributes.configuration) {
       packageJson.contributes.configuration = {
         title: displayName,
-        properties: {
-          [`${name}.license-key`]: {
-            type: "string",
-            default: "",
-            description: "Enter your license key",
-            scope: "global",
-          },
-        },
+        properties: {},
       };
     }
+
+    // Add or update the license key property
+    if (!packageJson.contributes.configuration.properties) {
+      packageJson.contributes.configuration.properties = {};
+    }
+
+    packageJson.contributes.configuration.properties[`${name}.license-key`] = {
+      type: "string",
+      default: "",
+      description: "Enter your license key",
+      scope: "global",
+    };
 
     // Create command using extension's name
     const activateLicenseCommand: VSCodeCommand = {
