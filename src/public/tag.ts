@@ -166,7 +166,8 @@ export function tagCommand<T extends (...args: any[]) => any>(
     console.error("[tagCommand] Invalid extension ID:", extensionId);
     throw new Error("Invalid extension ID");
   }
-  const extensionName = extensionNameComponents[1];
+  const extensionName =
+    extensionNameComponents[extensionNameComponents.length - 1];
   console.log("[tagCommand] Extension name:", extensionName);
 
   return (async (
