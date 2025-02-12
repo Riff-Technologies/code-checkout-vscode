@@ -1,4 +1,4 @@
-import { tagCommand, TagOptions } from "./tag";
+import { getLicense, LicenseData, tagCommand, TagOptions } from "./tag";
 import {
   withActivateCommand,
   injectCheckoutCommands,
@@ -11,4 +11,6 @@ export {
   injectCheckoutCommands,
   TagOptions,
   CheckoutOptions,
+  getLicense,
+  LicenseData,
 };

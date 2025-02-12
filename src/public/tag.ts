@@ -11,6 +11,76 @@ import {
  */
 type UnwrapPromise<T> = T extends Promise<infer U> ? U : T;
 
+export interface LicenseData {
+  licenseKey?: string;
+  isValid: boolean;
+  expiresOn?: string;
+  isExpired?: boolean;
+  isOnlineValidationRequired?: boolean;
+  lastValidated?: string;
+  machineId?: string;
+}
+
+/**
+ * Get the license information for the extension
+ * @param context - The extension context
+ * @param validateOnline - Whether to force online validation regardless of grace period
+ * @returns License data object or null if no license is stored
+ */
+export async function getLicense(
+  context: vscode.ExtensionContext,
+  validateOnline = false,
+): Promise<LicenseData | null> {
+  const licenseKey = await getStoredLicense(context);
+  if (!licenseKey) {
+    return null;
+  }
+
+  try {
+    // If online validation is requested or needed, perform it
+    if (validateOnline || (await needsOnlineValidation(context))) {
+      const validationResult = await validateLicense(context, licenseKey);
+      return {
+        licenseKey,
+        ...validationResult,
+        isOnlineValidationRequired: false,
+        lastValidated: new Date().toISOString(),
+      };
+    }
+
+    // Check if license is expired
+    const isExpired = await isLicenseExpired(context);
+    if (isExpired) {
+      // For expired licenses, always validate online
+      const validationResult = await validateLicense(context, licenseKey);
+      return {
+        licenseKey,
+        ...validationResult,
+        isOnlineValidationRequired: false,
+        lastValidated: new Date().toISOString(),
+      };
+    }
+
+    // Return offline validation result
+    return {
+      licenseKey,
+      isValid: true,
+      isExpired: false,
+      isOnlineValidationRequired: await needsOnlineValidation(context),
+      lastValidated: new Date().toISOString(),
+    };
+  } catch (error) {
+    console.error("License validation failed:", error);
+    return {
+      licenseKey,
+      isValid: false,
+      isExpired: true,
+      isOnlineValidationRequired: true,
+      lastValidated: new Date().toISOString(),
+    };
+  }
+}
+
 /**
  * Options for tagging a function with license validation
  */
@@ -24,6 +94,7 @@ export interface TagOptions {
 
 /**
  * Tags a function with license validation
+ * @param context - The extension context
  * @param options - Configuration options for the tag
  * @param fn - Function to wrap with license validation
  * @returns Tagged function that performs license validation before execution
@@ -49,64 +120,46 @@ export function tagCommand<T extends (...args: any[]) => any>(
   return (async (
     ...args: Parameters<T>
   ): Promise<UnwrapPromise<ReturnType<T>>> => {
-    // Check stored license
-    const licenseKey = await getStoredLicense(context);
-    if (!licenseKey) {
-      const message =
-        options.activationMessage || "This feature requires a valid license.";
-      const ctaTitle = options.activationCtaTitle || "Purchase License";
-      await showActivationPrompt(extensionName, message, ctaTitle);
-      return undefined as UnwrapPromise<ReturnType<T>>;
-    }
-
     try {
-      // Check if license is expired
-      const expired = await isLicenseExpired(context);
-      if (expired) {
-        // For expired licenses, we must validate against the server
+      // Get and validate license
+      const licenseData = await getLicense(context, false);
+
+      // Handle no license case
+      if (!licenseData || !licenseData.licenseKey) {
+        const message =
+          options.activationMessage || "This feature requires a valid license.";
+        const ctaTitle = options.activationCtaTitle || "Purchase License";
+        await showActivationPrompt(extensionName, message, ctaTitle);
+        return undefined as UnwrapPromise<ReturnType<T>>;
+      }
+
+      // Handle expired or invalid license
+      if (!licenseData.isValid || licenseData.isExpired) {
+        const message =
+          options.reactivationMessage || "Your license has expired.";
+        const ctaTitle = options.reactivationCtaTitle || "Purchase License";
+        await showActivationPrompt(extensionName, message, ctaTitle);
+        return undefined as UnwrapPromise<ReturnType<T>>;
+      }
+
+      // Handle online validation requirement
+      if (licenseData.isOnlineValidationRequired) {
         const validationResult = await vscode.window.withProgress(
           {
             location: vscode.ProgressLocation.Notification,
             title: "Validating license...",
             cancellable: false,
           },
-          () => validateLicense(context, licenseKey),
+          () => validateLicense(context, licenseData.licenseKey!),
         );
 
         if (!validationResult.isValid) {
-          const message =
-            options.reactivationMessage || "Your license has expired.";
-          const ctaTitle = options.reactivationCtaTitle || "Purchase License";
-          await showActivationPrompt(extensionName, message, ctaTitle);
-          return undefined as UnwrapPromise<ReturnType<T>>;
-        }
-      } else {
-        // License not expired, check if we need online validation
-        const needsOnline = await needsOnlineValidation(context);
-        if (needsOnline) {
-          // Outside grace period - must wait for server validation
-          const validationResult = await vscode.window.withProgress(
-            {
-              location: vscode.ProgressLocation.Notification,
-              title: "Validating license...",
-              cancellable: false,
-            },
-            () => validateLicense(context, licenseKey),
+          await showActivationPrompt(
+            extensionName,
+            validationResult.message || "Your license is invalid.",
+            "Purchase License",
           );
-
-          if (!validationResult.isValid) {
-            await showActivationPrompt(
-              validationResult.message || "Your license is invalid.",
-              extensionName,
-            );
-            return undefined as UnwrapPromise<ReturnType<T>>;
-          }
-        } else {
-          // Within grace period - validate in background
-          console.log("Validating license in background");
-          validateLicense(context, licenseKey).catch((error) => {
-            console.error("Background license validation failed:", error);
-          });
+          return undefined as UnwrapPromise<ReturnType<T>>;
         }
       }
 
@@ -118,9 +171,7 @@ export function tagCommand<T extends (...args: any[]) => any>(
     } catch (error) {
       console.error("License validation failed:", error);
       await vscode.window.showErrorMessage(
-        `Unable to validate license: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`,
+        `Unable to validate license: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
       return undefined as UnwrapPromise<ReturnType<T>>;
     }

@@ -4,6 +4,8 @@ import {
   injectCheckoutCommands,
   TagOptions,
   CheckoutOptions,
+  getLicense,
+  LicenseData,
 } from "./public";
 
 export {
@@ -12,4 +14,6 @@ export {
   injectCheckoutCommands,
   TagOptions,
   CheckoutOptions,
+  getLicense,
+  LicenseData,
 };
