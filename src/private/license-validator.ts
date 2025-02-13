@@ -1,9 +1,7 @@
 import * as vscode from "vscode";
 import * as os from "os";
 import * as crypto from "crypto";
-
-const API_ENDPOINT = "https://api.riff-tech.com/v1/validate";
-const DEV_API_ENDPOINT = "https://dev-api.riff-tech.com/v1/validate";
+import { getApiUrl } from "./utils";
 
 interface ValidationResult {
   isValid: boolean;
@@ -78,6 +76,20 @@ export interface Storage {
   removeItem(key: string): Promise<void>;
 }
 
+export async function storeLicenseKey(
+  context: vscode.ExtensionContext,
+  licenseKey: string,
+): Promise<void> {
+  const config = vscode.workspace.getConfiguration(
+    context.extension.packageJSON.name,
+  );
+  await config.update(
+    "license-key",
+    licenseKey,
+    vscode.ConfigurationTarget.Global,
+  );
+}
+
 /**
  * Stores license data in VSCode's secret storage
  */
@@ -85,14 +97,7 @@ async function storeLicenseData(
   context: vscode.ExtensionContext,
   data: LicenseData,
 ): Promise<void> {
-  const config = vscode.workspace.getConfiguration(
-    context.extension.packageJSON.name,
-  );
-  await config.update(
-    "license-key",
-    data.key,
-    vscode.ConfigurationTarget.Global,
-  );
+  await storeLicenseKey(context, data.key);
   await context.secrets.store("license-expires", data.expiresOn);
   await context.secrets.store("license-last-validated", data.lastValidated);
   await context.secrets.store("license-machine-id", data.machineId);
@@ -103,22 +108,26 @@ async function storeLicenseData(
  */
 async function clearLicenseData(
   context: vscode.ExtensionContext,
+  deleteLicenseKey = false,
 ): Promise<void> {
-  // Set last validated to 10 years ago to force validation
-  const tenYearsAgo = new Date();
-  tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
-  await context.secrets.store(
-    "license-last-validated",
-    tenYearsAgo.toISOString(),
-  );
-
-  // Don't clear out the license key
-  // const config = vscode.workspace.getConfiguration(
-  //   context.extension.packageJSON.name,
-  // );
-  // await config.update("license-key", "", vscode.ConfigurationTarget.Global);
-  // await context.secrets.delete("license-expires");
-  // await context.secrets.delete("license-machine-id");
+  if (!deleteLicenseKey) {
+    // Set last validated to 10 years ago to force validation
+    const tenYearsAgo = new Date();
+    tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
+    await context.secrets.store(
+      "license-last-validated",
+      tenYearsAgo.toISOString(),
+    );
+  } else if (deleteLicenseKey) {
+    // Don't clear out the license key
+    const config = vscode.workspace.getConfiguration(
+      context.extension.packageJSON.name,
+    );
+    await config.update("license-key", "", vscode.ConfigurationTarget.Global);
+    await context.secrets.delete("license-expires");
+    await context.secrets.delete("license-machine-id");
+    await context.secrets.delete("license-last-validated");
+  }
 }
 
 /**
@@ -160,7 +169,7 @@ export async function revokeLicense(
     "Revoke License",
   );
   if (result === "Revoke License") {
-    await clearLicenseData(context);
+    await clearLicenseData(context, true);
     await vscode.window.showInformationMessage("License revoked successfully!");
   }
 }
@@ -174,7 +183,6 @@ export async function revokeLicense(
 export async function validateLicense(
   context: vscode.ExtensionContext,
   licenseKey: string,
-  testMode = false,
   gracePeriodDays = 3,
 ): Promise<ValidationResult> {
   try {
@@ -208,7 +216,8 @@ export async function validateLicense(
           },
         };
 
-        const endpoint = testMode ? DEV_API_ENDPOINT : API_ENDPOINT;
+        const url = await getApiUrl(context);
+        const endpoint = `${url}/validate`;
         console.log("License validation request:", {
           endpoint,
           licenseKey: "***", // masked for security
