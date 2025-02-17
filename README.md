@@ -2,7 +2,7 @@
 
 > Add professional licensing and paywalls to your VSCode extensions in minutes!
 
-[![npm version](https://badge.fury.io/js/code-checkout.svg)](https://badge.fury.io/js/code-checkout)
+[![npm version](https://badge.fury.io/js/@riff-tech%2Fcode-checkout.svg)](https://badge.fury.io/js/@riff-tech%2Fcode-checkout)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 🌟 Features
@@ -25,78 +25,151 @@ code-checkout is more than just an npm package - it's a complete platform for ma
 
 Visit [codecheckout.dev](https://codecheckout.dev) to learn more about the full platform capabilities.
 
-## 📦 Installation
+## 🚀 Getting Started
+
+The code-checkout CLI is the recommended method to implement code-checkout into your VSCode extension. There are two ways to use code-checkout:
+
+- **Managed workflow** - Use this workflow to make your commands paid features
+- **Custom workflow** - Use the license and checkout functions directly in your code for more control over paywalls
+
+### Initialize Your Project
+
+1. **Install the CLI**
 
 ```bash
-npm install code-checkout
+npm install -g @riff-tech/code-checkout-cli
 ```
 
-## 🚀 Quick Start
+You can use the CLI with `code-checkout --help`.
 
-### 1. Create Your Account
-
-Sign up for a free account at [codecheckout.dev](https://codecheckout.dev/login).
-
-### 2. Install the Package
+2. **Initialize your VSCode extension project**
 
 ```bash
-npm install code-checkout
+code-checkout init
 ```
 
-### 3. Initialize Your Project
+This will walk you through creating a Publisher & Software, setting up a Pricing Model, linking your Stripe account, and bootstrapping your project to support licensing.
 
-Run our setup wizard to configure your extension:
+3. **Install the package**
 
 ```bash
-npx code-checkout-init
+npm install @riff-tech/code-checkout
 ```
 
-### 4. Wrap Your Activation
+### Managed Workflow
+
+Add the higher-order function and tag your commands as "paid":
 
 ```typescript
+import {
+  tagCommand,
+  injectCheckoutCommands,
+  TagOptions,
+} from "@riff-tech/code-checkout";
+
+// 1. Inject code-checkout commands to handle licensing
 export const activate = injectCheckoutCommands(
   (context: vscode.ExtensionContext) => {
-    // Your existing activation code
+    // Your original command
+    const originalCommand = () => {
+      vscode.window.showInformationMessage("Hello World");
+    };
+
+    // 2. Specify the tag options
+    const tagOptions: TagOptions = {
+      type: "paid",
+      activationMessage: "This feature is only available in the paid version",
+      activationCtaTitle: "Purchase License",
+      reactivationMessage: "This feature is only available in the paid version",
+      reactivationCtaTitle: "Purchase License",
+    };
+
+    // 3. Tag the command
+    const paidCommand = tagCommand(context, tagOptions, originalCommand);
+
+    // Register the command as usual
+    const disposable = vscode.commands.registerCommand(
+      "my-extension.paidCommand",
+      paidCommand,
+    );
+
+    // Add the disposable to the context
+    context.subscriptions.push(disposable);
   },
 );
 ```
 
-### 5. Tag Your Premium Commands
+### Manual Workflow
+
+#### Checking License Status
+
+You can use the `getLicense` function to check license status directly:
 
 ```typescript
-const paidFunction = tagCommand(
-  context,
-  { type: "paid" },
-  originalCommandFunction,
-);
+import { getLicense } from "@riff-tech/code-checkout";
+
+// Get license data
+const licenseData = await getLicense(context);
+
+if (licenseData?.isValid) {
+  // License is valid
+  vscode.window.showInformationMessage(
+    `License valid until ${licenseData.expiresOn}`,
+  );
+} else {
+  // No valid license
+  vscode.window.showWarningMessage("No valid license found");
+}
+
+// Force online validation
+const validatedLicense = await getLicense(context, true);
+
+// Check expiration
+if (validatedLicense?.isExpired) {
+  vscode.window.showErrorMessage("Your license has expired");
+}
 ```
 
-Now you're ready to publish your extension! 🎉
+The `getLicense` function returns a `LicenseData` object containing:
 
-## 🔧 How It Works
+- `isValid`: Whether the license is currently valid
+- `licenseKey`: The active license key if one exists
+- `isExpired`: Whether the license has expired
+- `isOnlineValidationRequired`: If online validation is needed
+- `lastValidated`: When the license was last validated
+- `machineId`: Unique identifier for the current machine
 
-### Command Integration
+#### Getting the Checkout URL
 
-The package automatically adds three commands to your extension:
+You can use the `getCheckoutUrl` function to get the checkout URL for your software:
 
-- `activateLicenseCommand` - Handles license key entry
-- `revokeLicenseCommand` - Manages license removal
-- `purchaseOnlineCommand` - Directs users to your purchase portal
+```typescript
+import { getCheckoutUrl, CheckoutUrlOptions } from "@riff-tech/code-checkout";
 
-### License Management
+// 1. Optional - set custom success and cancel URLs
+const checkoutUrlOptions: CheckoutUrlOptions = {
+  customSuccessUrl: "https://example.com/success", // defaults to codecheckout.dev/activate
+  customCancelUrl: "https://example.com/cancel", // defaults to redirect back to IDE
+};
 
-- 🌐 Server-side validation for maximum security
-- 🕒 Offline grace period (3 days - _feature to add customization coming soon_)
-- 💻 Machine ID tracking for license enforcement
-- 🚦 Background validation to avoid disrupting user flow
+// 2. Generate the checkout URL
+const checkoutUrl = await getCheckoutUrl(context, checkoutUrlOptions);
 
-### Build Process
+// 3. Open the checkout URL in the default browser
+await vscode.env.openExternal(vscode.Uri.parse(url));
+```
 
-Post-compilation processing automatically:
+When using custom URLs, the following query parameters will be appended:
 
-- 🔒 Obfuscates your JavaScript code
-- 🛡️ Protects license validation logic
-- 🚧 Secures command execution paths
+- `key=` - the license key (only for success URL)
+- `ideName=` - the app scheme of the IDE (vscode, cursor, etc)
+- `id=` - your extension ID
+
+Example:
+
+```
+https://example.com/success?key=1234567890&ideName=vscode&id=publisher.my-extension
+```
 
 ## 🛡️ Security Considerations
 
