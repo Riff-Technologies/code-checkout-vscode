@@ -154,12 +154,14 @@ async function handleUri(
 
 export type CheckoutOptions = {
   testMode?: boolean;
+  purchaseMdFile?: string;
   [key: string]: any;
 };
 
 /**
  * Injects the activate command into the extension
  * @param originalActivate - The original activate function
+ * @param options - The options for the activate command
  */
 export function injectCheckoutCommands(
   originalActivate: (context: vscode.ExtensionContext) => void,
@@ -299,7 +301,7 @@ export function injectCheckoutCommands(
             context,
             purchaseLicenseCommandId,
             async () => {
-              await activateLicenseOnline(context);
+              await activateLicenseOnline(context, options?.purchaseMdFile);
             },
           ),
         ),
@@ -399,23 +401,60 @@ export async function getCheckoutUrl(
 /**
  * Opens the license activation website in the default web browser
  * @param context - The VS Code extension context
- * @throws Error if unable to determine the extension ID or open the URL
+ * @param purchaseMdFile - The relative path to the purchase.md file from the extension root
+ * @throws Error if unable to determine the extension ID, open the URL, or find the purchase file
  */
 async function activateLicenseOnline(
   context: vscode.ExtensionContext,
+  purchaseMdFile?: string,
 ): Promise<void> {
   try {
-    await vscode.window.withProgress(
-      {
-        location: vscode.ProgressLocation.Notification,
-        title: "Preparing license activation...",
-        cancellable: false,
-      },
-      async () => {
-        const url = await getCheckoutUrl(context);
+    const url = await getCheckoutUrl(context);
+    if (purchaseMdFile) {
+      // Resolve the purchase.md file path relative to the extension's installation directory
+      const absolutePurchasePath = path.join(
+        context.extensionPath,
+        purchaseMdFile,
+      );
+
+      try {
+        // Open the purchase.md file in markdown preview
+        const purchaseDoc =
+          await vscode.workspace.openTextDocument(absolutePurchasePath);
+
+        // Open it directly in markdown preview mode
+        await vscode.commands.executeCommand(
+          "markdown.showPreview",
+          purchaseDoc.uri,
+        );
+
+        // Show info message with button to open checkout URL
+        const openButton = "Purchase Now";
+        const result = await vscode.window.showInformationMessage(
+          "Click to open the Checkout Page",
+          openButton,
+        );
+
+        if (result === openButton) {
+          await vscode.env.openExternal(vscode.Uri.parse(url));
+        }
+      } catch (error) {
+        console.error(`Failed to open purchase file: ${error}`);
+        // Fallback to direct URL open if file cannot be opened
         await vscode.env.openExternal(vscode.Uri.parse(url));
-      },
-    );
+      }
+    } else {
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Preparing license activation...",
+          cancellable: false,
+        },
+        async () => {
+          await vscode.env.openExternal(vscode.Uri.parse(url));
+        },
+      );
+    }
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
