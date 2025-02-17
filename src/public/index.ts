@@ -3,6 +3,8 @@ import {
   withActivateCommand,
   injectCheckoutCommands,
   CheckoutOptions,
+  getCheckoutUrl,
+  CheckoutUrlOptions,
 } from "./activate";
 
 export {
@@ -13,4 +15,6 @@ export {
   CheckoutOptions,
   getLicense,
   LicenseData,
+  getCheckoutUrl,
+  CheckoutUrlOptions,
 };

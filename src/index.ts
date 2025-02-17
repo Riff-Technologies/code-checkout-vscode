@@ -6,6 +6,8 @@ import {
   CheckoutOptions,
   getLicense,
   LicenseData,
+  getCheckoutUrl,
+  CheckoutUrlOptions,
 } from "./public";
 
 export {
@@ -16,4 +18,6 @@ export {
   CheckoutOptions,
   getLicense,
   LicenseData,
+  getCheckoutUrl,
+  CheckoutUrlOptions,
 };

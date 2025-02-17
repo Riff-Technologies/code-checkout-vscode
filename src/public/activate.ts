@@ -328,6 +328,74 @@ export function withActivateCommand() {
   };
 }
 
+export type CheckoutUrlOptions = {
+  customSuccessUrl?: string;
+  customCancelUrl?: string;
+  [key: string]: any;
+};
+
+/**
+ * Gets the checkout URL for the extension
+ * @param context - The VS Code extension context
+ * @param customSuccessUrl - The custom success URL to use, which will be appended with `key`, `ideName`, and `id` (license key, ide app scheme, and extension id)
+ * @param customCancelUrl - The custom cancel URL to use, which will be appended with `ideName` and `id` (ide app scheme and extension id)
+ * @returns The checkout URL
+ */
+export async function getCheckoutUrl(
+  context: vscode.ExtensionContext,
+  options?: CheckoutUrlOptions,
+) {
+  try {
+    // Store the license key before activating
+    // this ensures that the key is always stored,
+    // even if the user doesn't enter it or use the deeplink to activate it
+    // If the license key is not validated on the server it will be useless anyway
+    const licenseKey = generateLicenseKey();
+    await storeLicenseKey(context, licenseKey);
+
+    const apiUrl = await getApiUrl(context);
+    const { id: extensionId, packageJSON } = context.extension;
+    const name = packageJSON.displayName;
+    const appScheme = vscode.env.uriScheme;
+    const appUri = `${appScheme}://`;
+
+    const { customSuccessUrl, customCancelUrl } = options || {};
+
+    // Create and encode the redirect URI first
+    const redirectUri = encodeURIComponent(
+      `${appUri}${extensionId}/activate?key=${licenseKey}`,
+    );
+    const successUrl = customSuccessUrl
+      ? `${customSuccessUrl}?key=${licenseKey}&ideName=${appScheme}&id=${extensionId}`
+      : encodeURIComponent(
+          `${WEB_URL}/activate?key=${licenseKey}&name=${name}&redirectUri=${redirectUri}`,
+        );
+    const cancelUrl = customCancelUrl
+      ? `${customCancelUrl}?ideName=${appScheme}&id=${extensionId}`
+      : encodeURIComponent(`${apiUrl}/ide-redirect?target=${appUri}`);
+    const testParam = (await isTestMode(context)) ? "&testMode=true" : "";
+    const purchaseUrl = `${apiUrl}/${extensionId}/checkout?licenseKey=${licenseKey}&successUrl=${successUrl}&cancelUrl=${cancelUrl}${testParam}`;
+
+    console.log("purchaseUrl", purchaseUrl);
+    const purchaseUrlObject = new URL(purchaseUrl);
+
+    console.log("purchaseUrlObject", purchaseUrlObject);
+
+    // fetch the purchase url
+    const response = await fetch(purchaseUrlObject.toString());
+
+    console.log("response", response);
+    const { url } = await response.json();
+    console.log("url", url);
+
+    return url;
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    throw new Error(`Failed to open activation website: ${errorMessage}`);
+  }
+}
+
 /**
  * Opens the license activation website in the default web browser
  * @param context - The VS Code extension context
@@ -344,45 +412,7 @@ async function activateLicenseOnline(
         cancellable: false,
       },
       async () => {
-        // Store the license key before activating
-        // this ensures that the key is always stored,
-        // even if the user doesn't enter it or use the deeplink to activate it
-        // If the license key is not validated on the server it will be useless anyway
-        const licenseKey = generateLicenseKey();
-        await storeLicenseKey(context, licenseKey);
-
-        const apiUrl = await getApiUrl(context);
-        const { id: extensionId, packageJSON } = context.extension;
-        const name = packageJSON.displayName;
-        const appScheme = vscode.env.uriScheme;
-        const appUri = `${appScheme}://`;
-
-        // Create and encode the redirect URI first
-        const redirectUri = encodeURIComponent(
-          `${appUri}${extensionId}/activate?key=${licenseKey}`,
-        );
-        // Create and encode the full success URL
-        const successUrl = encodeURIComponent(
-          `${WEB_URL}/activate?key=${licenseKey}&name=${name}&redirectUri=${redirectUri}`,
-        );
-        const cancelUrl = encodeURIComponent(
-          `${apiUrl}/ide-redirect?target=${appUri}`,
-        );
-        const testParam = (await isTestMode(context)) ? "&testMode=true" : "";
-        const purchaseUrl = `${apiUrl}/${extensionId}/checkout?licenseKey=${licenseKey}&successUrl=${successUrl}&cancelUrl=${cancelUrl}${testParam}`;
-
-        console.log("purchaseUrl", purchaseUrl);
-        const purchaseUrlObject = new URL(purchaseUrl);
-
-        console.log("purchaseUrlObject", purchaseUrlObject);
-
-        // fetch the purchase url
-        const response = await fetch(purchaseUrlObject.toString());
-
-        console.log("response", response);
-        const { url } = await response.json();
-        console.log("url", url);
-
+        const url = await getCheckoutUrl(context);
         await vscode.env.openExternal(vscode.Uri.parse(url));
       },
     );
