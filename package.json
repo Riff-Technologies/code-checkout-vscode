@@ -1,5 +1,5 @@
 {
-  "name": "@riff-tech/code-checkout",
+  "name": "@riff-tech/code-checkout-vscode",
   "version": "1.5.1",
   "publisher": "riff-tech",
   "description": "Code Checkout support for paid VSCode Extensions",

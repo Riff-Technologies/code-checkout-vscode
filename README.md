@@ -1,8 +1,8 @@
-# code-checkout 🔐
+# code-checkout-vscode 🔐
 
 > Add professional licensing and paywalls to your VSCode extensions in minutes!
 
-[![npm version](https://badge.fury.io/js/@riff-tech%2Fcode-checkout.svg)](https://badge.fury.io/js/@riff-tech%2Fcode-checkout)
+[![npm version](https://badge.fury.io/js/@riff-tech%2Fcode-checkout-vscode.svg)](https://badge.fury.io/js/@riff-tech%2Fcode-checkout-vscode)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 🌟 Features
