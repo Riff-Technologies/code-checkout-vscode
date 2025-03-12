@@ -16,7 +16,7 @@
 
 ## 🌐 Platform & Tools
 
-code-checkout is more than just an npm package - it's a complete platform for managing your software licensing:
+code-checkout-vscode is more than just an npm package - it's a complete platform for managing your software licensing:
 
 - 💼 [Create a free account](https://codecheckout.dev/login) to get started
 - 🖥️ Web Dashboard - Manage licenses, track usage, and view analytics
@@ -37,7 +37,7 @@ The code-checkout CLI is the recommended method to implement code-checkout into 
 1. **Install the CLI**
 
 ```bash
-npm install -g @riff-tech/code-checkout-cli
+npm install -g @riff-tech/code-checkout-vscode-cli
 ```
 
 You can use the CLI with `code-checkout --help`.
@@ -53,7 +53,7 @@ This will walk you through creating a Publisher & Software, setting up a Pricing
 3. **Install the package**
 
 ```bash
-npm install @riff-tech/code-checkout
+npm install @riff-tech/code-checkout-vscode
 ```
 
 ### Managed Workflow
@@ -65,7 +65,7 @@ import {
   tagCommand,
   injectCheckoutCommands,
   TagOptions,
-} from "@riff-tech/code-checkout";
+} from "@riff-tech/code-checkout-vscode";
 
 // 1. Inject code-checkout commands to handle licensing
 export const activate = injectCheckoutCommands(
@@ -106,7 +106,7 @@ export const activate = injectCheckoutCommands(
 You can use the `getLicense` function to check license status directly:
 
 ```typescript
-import { getLicense } from "@riff-tech/code-checkout";
+import { getLicense } from "@riff-tech/code-checkout-vscode";
 
 // Get license data
 const licenseData = await getLicense(context);
@@ -144,7 +144,10 @@ The `getLicense` function returns a `LicenseData` object containing:
 You can use the `getCheckoutUrl` function to get the checkout URL for your software:
 
 ```typescript
-import { getCheckoutUrl, CheckoutUrlOptions } from "@riff-tech/code-checkout";
+import {
+  getCheckoutUrl,
+  CheckoutUrlOptions,
+} from "@riff-tech/code-checkout-vscode";
 
 // 1. Optional - set custom success and cancel URLs
 const checkoutUrlOptions: CheckoutUrlOptions = {
@@ -183,8 +186,8 @@ MIT © Riff Tech, LLC
 
 ## 🌟 Support
 
-- 🐛 Found a bug? [Open an issue](https://github.com/Riff-Technologies/code-checkout/issues)
-- 💡 Have a feature request? [Let us know](https://github.com/Riff-Technologies/code-checkout/issues)
+- 🐛 Found a bug? [Open an issue](https://github.com/Riff-Technologies/code-checkout-vscode/issues)
+- 💡 Have a feature request? [Let us know](https://github.com/Riff-Technologies/code-checkout-vscode/issues)
 - 📧 Need help? [Contact support](mailto:shawn@riff-tech.com)
 
 ---

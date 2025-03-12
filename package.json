@@ -31,7 +31,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Riff-Technologies/code-checkout.git"
+    "url": "git+https://github.com/Riff-Technologies/code-checkout-vscode.git"
   },
   "author": "Riff Tech, LLC",
   "license": "MIT",

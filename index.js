@@ -1,5 +1,5 @@
 /**
- * Entry point for the code-checkout package.
+ * Entry point for the code-checkout-vscode package.
  * This module provides the main functionality for the package.
  */
 
