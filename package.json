@@ -2,7 +2,7 @@
   "name": "@riff-tech/code-checkout-vscode",
   "version": "1.5.1",
   "publisher": "riff-tech",
-  "description": "Code Checkout support for paid VSCode Extensions",
+  "description": "code-checkout support for paid VSCode Extensions",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
